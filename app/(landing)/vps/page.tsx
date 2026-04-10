@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "Paket Cloud VPS Linux dan Windows dengan harga terjangkau. SSD NVMe, proteksi DDoS, dan support 24/7.",
 };
 
-const IP_STATIC_PRICE = "50.000";
+const IP_STATIC_PRICE = "100.000";
 
 const linuxPlans = [
   { name: "VPS Linux S", price: "49.000", cpu: "1 vCPU", ram: "1 GB", storage: "25 GB NVMe", bandwidth: "1 TB", os: "Ubuntu/Debian/CentOS" },
@@ -39,10 +39,10 @@ const included = [
 
 function PlanCard({ plan }: { plan: typeof linuxPlans[0] & { popular?: boolean } }) {
   return (
-    <Card className={plan.popular ? "relative border-primary shadow-lg" : "relative"}>
+    <Card className={cn(plan.popular ? "border-primary shadow-lg" : "", "overflow-hidden")}>
       {plan.popular && (
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
-          <Badge className="px-4 shadow-sm">Paling Populer</Badge>
+        <div className="bg-primary text-primary-foreground text-center text-xs font-semibold py-1.5 tracking-wide">
+          ★ Paling Populer
         </div>
       )}
       <CardHeader className="pb-4">
@@ -111,7 +111,7 @@ export default function VpsPage() {
             <span className="inline-block h-4 w-1 bg-primary rounded" />
             Cloud VPS Linux
           </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 pt-5">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {linuxPlans.map((plan) => <PlanCard key={plan.name} plan={plan} />)}
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function VpsPage() {
             <span className="inline-block h-4 w-1 bg-primary rounded" />
             Cloud VPS Windows
           </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 pt-5">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {windowsPlans.map((plan) => <PlanCard key={plan.name} plan={plan} />)}
           </div>
         </div>

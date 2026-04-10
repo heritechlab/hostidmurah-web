@@ -82,15 +82,18 @@ export default function Home() {
               <h2 className="text-3xl font-bold md:text-4xl">Paket VPS Terpopuler</h2>
               <p className="mt-4 text-muted-foreground">Pilih paket yang sesuai dengan kebutuhan Anda</p>
             </div>
-            <div className="grid gap-8 md:grid-cols-3 pt-5">
+            <div className="grid gap-8 md:grid-cols-3">
               {plans.map((plan) => (
                 <Card
                   key={plan.name}
-                  className={plan.popular ? "relative transition-shadow hover:shadow-lg border-primary shadow-md" : "relative transition-shadow hover:shadow-lg"}
+                  className={cn(
+                    "overflow-hidden transition-shadow hover:shadow-lg",
+                    plan.popular ? "border-primary shadow-md" : ""
+                  )}
                 >
                   {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge className="px-4">Paling Populer</Badge>
+                    <div className="bg-primary text-primary-foreground text-center text-xs font-semibold py-1.5 tracking-wide">
+                      ★ Paling Populer
                     </div>
                   )}
                   <CardHeader className="pb-4">
