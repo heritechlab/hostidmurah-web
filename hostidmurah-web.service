@@ -1,0 +1,29 @@
+# Salin ke VPS: /etc/systemd/system/hostidmurah-web.service
+# Lalu:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable hostidmurah-web
+#   sudo systemctl start hostidmurah-web
+#   sudo systemctl status hostidmurah-web
+
+[Unit]
+Description=HostIDMurah Web (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/hostidmurah-web
+ExecStart=/usr/bin/node node_modules/.bin/next start -p 3000
+Restart=on-failure
+RestartSec=5
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/var/www/hostidmurah-web/.env.local
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hostidmurah-web
+
+[Install]
+WantedBy=multi-user.target
