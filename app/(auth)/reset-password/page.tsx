@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -24,7 +24,7 @@ const resetSchema = z
   });
 type ResetForm = z.infer<typeof resetSchema>;
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -57,7 +57,6 @@ export default function ResetPasswordPage() {
     }
   };
 
-  // No token in URL
   if (!token) {
     return (
       <div className="w-full text-center">
@@ -164,5 +163,17 @@ export default function ResetPasswordPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full text-center">
+        <Loader2 className="size-8 animate-spin text-primary mx-auto" />
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

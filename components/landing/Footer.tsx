@@ -16,6 +16,7 @@ const footerLinks = {
   ],
   Perusahaan: [
     { title: "Fitur Unggulan", href: "/features" },
+    { title: "Jasa Website", href: "/jasa-website" },
     { title: "Blog & Artikel", href: "/blog" },
     { title: "Kontak", href: "/contact" },
   ],

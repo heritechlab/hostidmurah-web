@@ -61,6 +61,24 @@ const navLinks = [
   { title: "Kontak", href: "/contact" },
 ];
 
+const otherLinks = [
+  {
+    title: "Jasa Pembuatan Website",
+    href: "/jasa-website",
+    description: "Landing page, company profile, toko online, dan aplikasi web custom.",
+  },
+  {
+    title: "Program Referral",
+    href: "/dashboard/referral",
+    description: "Ajak teman dan dapatkan komisi untuk setiap referral berhasil.",
+  },
+  {
+    title: "Status Server",
+    href: "https://status.hostidmurah.web.id",
+    description: "Pantau status uptime dan insiden layanan secara real-time.",
+  },
+];
+
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuValue, setMenuValue] = useState<string | undefined>(undefined);
@@ -151,6 +169,38 @@ export function Navbar() {
                   </NavigationMenuLink>
                 </NavigationMenuItem>
               ))}
+
+              <NavigationMenuItem value="lainnya">
+                <NavigationMenuTrigger className="text-sm font-medium">
+                  Lainnya
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[400px] gap-3 p-4">
+                    {otherLinks.map((item) => (
+                      <li key={item.href}>
+                        <NavigationMenuLink
+                          render={
+                            item.href.startsWith("http") ? (
+                              <a href={item.href} target="_blank" rel="noopener noreferrer" onClick={closeMenu} />
+                            ) : (
+                              <Link href={item.href} onClick={closeMenu} />
+                            )
+                          }
+                          className={cn(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors",
+                            "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                          )}
+                        >
+                          <div className="text-sm font-medium leading-none">{item.title}</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            {item.description}
+                          </p>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
         </nav>
@@ -268,6 +318,31 @@ export function Navbar() {
                       {link.title}
                     </Link>
                   ))}
+                  <div className="my-2 h-px bg-border" />
+                  <p className="text-xs font-semibold uppercase text-muted-foreground px-2 mb-1">Lainnya</p>
+                  {otherLinks.map((item) =>
+                    item.href.startsWith("http") ? (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        {item.title}
+                      </a>
+                    ) : (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        {item.title}
+                      </Link>
+                    )
+                  )}
                 </nav>
 
                 <div className="flex flex-col gap-2 mt-auto">
