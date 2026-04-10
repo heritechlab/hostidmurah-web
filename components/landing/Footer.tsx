@@ -3,20 +3,23 @@ import { Server } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const footerLinks = {
-  Produk: [
+  Server: [
     { title: "Cloud VPS Linux", href: "/vps" },
     { title: "Cloud VPS Windows", href: "/vps/windows" },
     { title: "Dedicated Server", href: "/dedicated" },
     { title: "Semua Harga", href: "/pricing" },
   ],
+  Hosting: [
+    { title: "Shared Hosting", href: "/hosting/shared" },
+    { title: "WordPress Hosting", href: "/hosting/wordpress" },
+    { title: "Cloud Hosting", href: "/hosting/cloud" },
+  ],
   Perusahaan: [
-    { title: "Tentang Kami", href: "/about" },
     { title: "Fitur Unggulan", href: "/features" },
-    { title: "Blog", href: "/blog" },
+    { title: "Blog & Artikel", href: "/blog" },
     { title: "Kontak", href: "/contact" },
   ],
   Bantuan: [
-    { title: "Dokumentasi", href: "/docs" },
     { title: "Status Server", href: "https://status.hostidmurah.web.id" },
     { title: "Kebijakan Privasi", href: "/privacy" },
     { title: "Syarat & Ketentuan", href: "/terms" },
@@ -27,7 +30,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/30">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-5">
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">

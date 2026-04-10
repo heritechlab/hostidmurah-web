@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CheckCircle, Phone } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -68,10 +69,18 @@ export default function DedicatedPage() {
 
         <div className="grid gap-8 md:grid-cols-3 mb-16">
           {plans.map((plan) => (
-            <Card key={plan.name} className={plan.popular ? "relative border-primary shadow-lg" : "relative"}>
+            <Card
+              key={plan.name}
+              className={cn(
+                "overflow-hidden flex flex-col transition-all duration-300 ease-out hover:-translate-y-1.5",
+                plan.popular
+                  ? "border-primary shadow-lg shadow-primary/10 hover:shadow-xl hover:shadow-primary/20"
+                  : "hover:shadow-lg hover:shadow-primary/8 hover:border-primary/30"
+              )}
+            >
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="px-4">Paling Populer</Badge>
+                <div className="bg-primary text-primary-foreground text-center text-xs font-semibold py-1.5 tracking-wide">
+                  ★ Paling Populer
                 </div>
               )}
               <CardHeader className="pb-4">
@@ -81,8 +90,8 @@ export default function DedicatedPage() {
                   <span className="text-sm">/bulan</span>
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 text-sm">
+              <CardContent className="space-y-4 flex flex-col flex-1">
+                <div className="space-y-2 text-sm flex-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">CPU</span>
                     <span className="font-medium text-right text-xs">{plan.cpu}</span>
@@ -106,7 +115,7 @@ export default function DedicatedPage() {
                 </div>
                 <Link
                   href="/contact"
-                  className={`w-full text-center ${buttonVariants({ variant: plan.popular ? "default" : "outline" })}`}
+                  className={cn("w-full text-center", buttonVariants({ variant: plan.popular ? "default" : "outline" }))}
                 >
                   Hubungi Sales
                 </Link>

@@ -117,7 +117,12 @@ const faqs = [
 
 function PlanCard({ plan }: { plan: typeof linuxPlans[0] & { popular?: boolean } }) {
   return (
-    <Card className={cn(plan.popular ? "border-primary shadow-lg" : "", "overflow-hidden flex flex-col")}>
+    <Card className={cn(
+      "overflow-hidden flex flex-col transition-all duration-300 ease-out hover:-translate-y-1.5",
+      plan.popular
+        ? "border-primary shadow-lg shadow-primary/10 hover:shadow-xl hover:shadow-primary/20"
+        : "hover:shadow-lg hover:shadow-primary/8 hover:border-primary/30"
+    )}>
       {plan.popular && (
         <div className="bg-primary text-primary-foreground text-center text-xs font-semibold py-1.5 tracking-wide">
           ★ Paling Populer

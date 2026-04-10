@@ -2,28 +2,47 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, Tag, Server, ChevronRight, ShieldCheck, Clock, Headphones, Pencil, Lock } from "lucide-react";
+import { CheckCircle, Tag, Server, ChevronRight, ShieldCheck, Clock, Headphones, Pencil, Lock, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Product Data ─────────────────────────────────────────────────────────────
 
 const linuxPlans = [
-  { id: "vps-l-s",   name: "VPS Linux S",   basePrice: 49000,  cpu: "1 vCPU",  ram: "1 GB",   storage: "25 GB NVMe",  bandwidth: "1 TB" },
-  { id: "vps-l-m",   name: "VPS Linux M",   basePrice: 99000,  cpu: "2 vCPU",  ram: "4 GB",   storage: "80 GB NVMe",  bandwidth: "3 TB" },
-  { id: "vps-l-l",   name: "VPS Linux L",   basePrice: 199000, cpu: "4 vCPU",  ram: "8 GB",   storage: "160 GB NVMe", bandwidth: "5 TB" },
-  { id: "vps-l-xl",  name: "VPS Linux XL",  basePrice: 349000, cpu: "8 vCPU",  ram: "16 GB",  storage: "320 GB NVMe", bandwidth: "8 TB" },
-  { id: "vps-l-xxl", name: "VPS Linux XXL", basePrice: 649000, cpu: "16 vCPU", ram: "32 GB",  storage: "640 GB NVMe", bandwidth: "10 TB" },
+  { id: "vps-l-s",   name: "VPS Linux S",   basePrice: 49000,  cpu: "1 vCPU",  ram: "1 GB",   storage: "25 GB NVMe",  bandwidth: "1 TB",  spec: "1 vCPU · 1 GB · 25 GB NVMe" },
+  { id: "vps-l-m",   name: "VPS Linux M",   basePrice: 99000,  cpu: "2 vCPU",  ram: "4 GB",   storage: "80 GB NVMe",  bandwidth: "3 TB",  spec: "2 vCPU · 4 GB · 80 GB NVMe" },
+  { id: "vps-l-l",   name: "VPS Linux L",   basePrice: 199000, cpu: "4 vCPU",  ram: "8 GB",   storage: "160 GB NVMe", bandwidth: "5 TB",  spec: "4 vCPU · 8 GB · 160 GB NVMe" },
+  { id: "vps-l-xl",  name: "VPS Linux XL",  basePrice: 349000, cpu: "8 vCPU",  ram: "16 GB",  storage: "320 GB NVMe", bandwidth: "8 TB",  spec: "8 vCPU · 16 GB · 320 GB NVMe" },
+  { id: "vps-l-xxl", name: "VPS Linux XXL", basePrice: 649000, cpu: "16 vCPU", ram: "32 GB",  storage: "640 GB NVMe", bandwidth: "10 TB", spec: "16 vCPU · 32 GB · 640 GB NVMe" },
 ];
 
 const windowsPlans = [
-  { id: "vps-w-s",  name: "VPS Windows S",  basePrice: 149000, cpu: "2 vCPU",  ram: "4 GB",  storage: "80 GB NVMe",  bandwidth: "2 TB" },
-  { id: "vps-w-m",  name: "VPS Windows M",  basePrice: 249000, cpu: "4 vCPU",  ram: "8 GB",  storage: "160 GB NVMe", bandwidth: "4 TB" },
-  { id: "vps-w-l",  name: "VPS Windows L",  basePrice: 449000, cpu: "8 vCPU",  ram: "16 GB", storage: "320 GB NVMe", bandwidth: "6 TB" },
-  { id: "vps-w-xl", name: "VPS Windows XL", basePrice: 799000, cpu: "16 vCPU", ram: "32 GB", storage: "640 GB NVMe", bandwidth: "10 TB" },
+  { id: "vps-w-s",  name: "VPS Windows S",  basePrice: 149000, cpu: "2 vCPU",  ram: "4 GB",  storage: "80 GB NVMe",  bandwidth: "2 TB",  spec: "2 vCPU · 4 GB · 80 GB NVMe" },
+  { id: "vps-w-m",  name: "VPS Windows M",  basePrice: 249000, cpu: "4 vCPU",  ram: "8 GB",  storage: "160 GB NVMe", bandwidth: "4 TB",  spec: "4 vCPU · 8 GB · 160 GB NVMe" },
+  { id: "vps-w-l",  name: "VPS Windows L",  basePrice: 449000, cpu: "8 vCPU",  ram: "16 GB", storage: "320 GB NVMe", bandwidth: "6 TB",  spec: "8 vCPU · 16 GB · 320 GB NVMe" },
+  { id: "vps-w-xl", name: "VPS Windows XL", basePrice: 799000, cpu: "16 vCPU", ram: "32 GB", storage: "640 GB NVMe", bandwidth: "10 TB", spec: "16 vCPU · 32 GB · 640 GB NVMe" },
+];
+
+const hostingSharedPlans = [
+  { id: "hosting-shared-starter",  name: "Shared Starter",  basePrice: 19000, spec: "2 GB SSD · 1 Domain · Unlimited BW" },
+  { id: "hosting-shared-business", name: "Shared Business", basePrice: 39000, spec: "5 GB SSD · 3 Domain · Unlimited BW" },
+  { id: "hosting-shared-pro",      name: "Shared Pro",      basePrice: 69000, spec: "15 GB SSD · 10 Domain · Unlimited BW" },
+];
+
+const hostingWordPressPlan = [
+  { id: "hosting-wp-starter",  name: "WP Starter",  basePrice: 29000, spec: "5 GB SSD · 1 Site · 10.000 kunjungan" },
+  { id: "hosting-wp-business", name: "WP Business", basePrice: 59000, spec: "15 GB SSD · 3 Site · 50.000 kunjungan" },
+  { id: "hosting-wp-pro",      name: "WP Pro",      basePrice: 99000, spec: "30 GB SSD · Unlimited Site · 200.000 kunjungan" },
+];
+
+const hostingCloudPlans = [
+  { id: "hosting-cloud-lite",     name: "Cloud Lite",     basePrice: 49000,  spec: "1 vCPU · 1 GB · 20 GB SSD · 2 TB BW" },
+  { id: "hosting-cloud-business", name: "Cloud Business", basePrice: 99000,  spec: "2 vCPU · 2 GB · 40 GB SSD · 4 TB BW" },
+  { id: "hosting-cloud-pro",      name: "Cloud Pro",      basePrice: 179000, spec: "4 vCPU · 4 GB · 80 GB SSD · 8 TB BW" },
 ];
 
 const durations = [
@@ -36,10 +55,10 @@ const durations = [
 const linuxDistros = [
   { id: "ubuntu-22", name: "Ubuntu 22.04 LTS", logo: "🟠" },
   { id: "ubuntu-24", name: "Ubuntu 24.04 LTS", logo: "🟠" },
-  { id: "debian-12", name: "Debian 12",        logo: "🔴" },
-  { id: "alma-9",    name: "AlmaLinux 9",       logo: "🔵" },
-  { id: "rocky-9",   name: "Rocky Linux 9",     logo: "🟢" },
-  { id: "fedora-39", name: "Fedora 39",          logo: "🔵" },
+  { id: "debian-12", name: "Debian 12",         logo: "🔴" },
+  { id: "alma-9",    name: "AlmaLinux 9",        logo: "🔵" },
+  { id: "rocky-9",   name: "Rocky Linux 9",      logo: "🟢" },
+  { id: "fedora-39", name: "Fedora 39",           logo: "🔵" },
 ];
 
 const windowsDistros = [
@@ -47,15 +66,55 @@ const windowsDistros = [
   { id: "win-2019", name: "Windows Server 2019", logo: "🪟" },
 ];
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ProductType = "linux" | "windows" | "hosting-shared" | "hosting-wordpress" | "hosting-cloud";
+type Plan = { id: string; name: string; basePrice: number; spec: string; [key: string]: unknown };
+type Duration = typeof durations[0];
+type Distro = typeof linuxDistros[0];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRupiah(n: number) {
   return n.toLocaleString("id-ID");
 }
 
-type Plan = typeof linuxPlans[0];
-type Duration = typeof durations[0];
-type Distro = typeof linuxDistros[0];
+function getProductMeta(type: ProductType) {
+  const isHosting = type.startsWith("hosting");
+  const labels: Record<ProductType, { category: string; back: string; title: string }> = {
+    "linux":             { category: "VPS Linux",          back: "VPS",     title: "Konfigurasi VPS Linux" },
+    "windows":           { category: "VPS Windows",        back: "VPS",     title: "Konfigurasi VPS Windows" },
+    "hosting-shared":    { category: "Shared Hosting",     back: "Hosting", title: "Konfigurasi Shared Hosting" },
+    "hosting-wordpress": { category: "WordPress Hosting",  back: "Hosting", title: "Konfigurasi WordPress Hosting" },
+    "hosting-cloud":     { category: "Cloud Hosting",      back: "Hosting", title: "Konfigurasi Cloud Hosting" },
+  };
+  return { ...labels[type], isHosting };
+}
+
+function getPlansForType(type: ProductType): Plan[] {
+  switch (type) {
+    case "linux":             return linuxPlans as Plan[];
+    case "windows":           return windowsPlans as Plan[];
+    case "hosting-shared":    return hostingSharedPlans as Plan[];
+    case "hosting-wordpress": return hostingWordPressPlan as Plan[];
+    case "hosting-cloud":     return hostingCloudPlans as Plan[];
+  }
+}
+
+function matchPlanFromUrl(type: ProductType, planParam: string): Plan | null {
+  const plans = getPlansForType(type);
+  // Try exact id match first
+  let found = plans.find((p) => p.id === planParam);
+  if (!found) {
+    // Try matching by slug: remove prefix and compare
+    found = plans.find((p) =>
+      p.id.toLowerCase().replace(/^(hosting-\w+-|vps-[lw]-)/i, "") === planParam.toLowerCase() ||
+      p.id.toLowerCase() === planParam.toLowerCase() ||
+      p.name.toLowerCase().replace(/\s+/g, "-") === planParam.toLowerCase()
+    );
+  }
+  return found ?? null;
+}
 
 // ─── Step Header ─────────────────────────────────────────────────────────────
 
@@ -79,10 +138,7 @@ function StepHeader({
           {status === "done" ? <CheckCircle className="h-3.5 w-3.5" /> :
            status === "locked" ? <Lock className="h-3 w-3" /> : number}
         </span>
-        <CardTitle className={cn(
-          "text-base",
-          status === "locked" && "text-muted-foreground/50"
-        )}>
+        <CardTitle className={cn("text-base", status === "locked" && "text-muted-foreground/50")}>
           {label}
         </CardTitle>
       </div>
@@ -103,62 +159,79 @@ function StepHeader({
 export function OrderClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialType = searchParams.get("type") === "windows" ? "windows" : "linux";
-  const initialPlanId = searchParams.get("plan") ?? "";
+  const { user } = useAuth();
 
-  // Form state — persisted across step navigation
-  const [osType, setOsType]               = useState<"linux" | "windows">(initialType);
-  const [selectedPlan, setSelectedPlan]   = useState<Plan | null>(null);
+  // Parse URL params
+  const rawType  = searchParams.get("type") ?? "linux";
+  const planParam = searchParams.get("plan") ?? "";
+
+  const productType: ProductType = (
+    ["linux", "windows", "hosting-shared", "hosting-wordpress", "hosting-cloud"].includes(rawType)
+      ? rawType
+      : "linux"
+  ) as ProductType;
+
+  const { category, back, title, isHosting } = getProductMeta(productType);
+
+  // ─── Form state ────────────────────────────────────────────────────────────
+  const [selectedPlan, setSelectedPlan]         = useState<Plan | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<Duration>(durations[0]);
   const [selectedDistro, setSelectedDistro]     = useState<Distro>(linuxDistros[0]);
-  const [addIpStatic, setAddIpStatic]     = useState(false);
-  const [hostname, setHostname]           = useState("");
-  const [customerName, setCustomerName]   = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [note, setNote]                   = useState("");
+  const [addIpStatic, setAddIpStatic]           = useState(false);
+  const [domain, setDomain]                     = useState("");
+  const [hostname, setHostname]                 = useState("");
+  const [customerName, setCustomerName]         = useState("");
+  const [customerEmail, setCustomerEmail]       = useState("");
+  const [customerPhone, setCustomerPhone]       = useState("");
+  const [note, setNote]                         = useState("");
+  const [activeStep, setActiveStep]             = useState(1);
+  const [maxStep, setMaxStep]                   = useState(1);
 
-  // Which step is currently expanded for editing (1, 2, 3)
-  const [activeStep, setActiveStep] = useState(1);
-  // Furthest step reached (controls lock/done state)
-  const [maxStep, setMaxStep] = useState(1);
-
-  const plans   = osType === "linux" ? linuxPlans : windowsPlans;
-  const distros = osType === "linux" ? linuxDistros : windowsDistros;
+  const plans = getPlansForType(productType);
 
   // Pre-select plan from URL
   useEffect(() => {
-    if (initialPlanId) {
-      const all = [...linuxPlans, ...windowsPlans];
-      const found = all.find((p) => p.id === initialPlanId);
+    if (planParam) {
+      const found = matchPlanFromUrl(productType, planParam);
       if (found) {
         setSelectedPlan(found);
-        setOsType(found.id.startsWith("vps-w") ? "windows" : "linux");
         setActiveStep(2);
         setMaxStep(2);
       }
     }
   }, []); // eslint-disable-line
 
-  // Reset distro when OS type changes
+  // Auto-fill customer data from logged-in user
   useEffect(() => {
-    setSelectedDistro(osType === "linux" ? linuxDistros[0] : windowsDistros[0]);
-  }, [osType]);
+    if (user) {
+      setCustomerName(user.name ?? "");
+      setCustomerEmail(user.email ?? "");
+      setCustomerPhone(user.phone ?? "");
+    }
+  }, [user]);
 
-  // Price calculation
+  // Reset distro when OS type changes (VPS only)
+  useEffect(() => {
+    if (!isHosting) {
+      setSelectedDistro(productType === "windows" ? windowsDistros[0] : linuxDistros[0]);
+    }
+  }, [productType, isHosting]);
+
+  // ─── Price calculation ─────────────────────────────────────────────────────
   const IP_STATIC_MONTHLY   = 100000;
   const monthlyPrice        = selectedPlan?.basePrice ?? 0;
   const totalBeforeDiscount = monthlyPrice * selectedDuration.months;
   const totalDiscount       = Math.round(totalBeforeDiscount * selectedDuration.discount / 100);
-  const ipStaticTotal       = addIpStatic ? IP_STATIC_MONTHLY * selectedDuration.months : 0;
+  const ipStaticTotal       = (!isHosting && addIpStatic) ? IP_STATIC_MONTHLY * selectedDuration.months : 0;
   const totalPrice          = totalBeforeDiscount - totalDiscount + ipStaticTotal;
   const effectiveMonthly    = selectedDuration.months > 0 ? Math.round(totalPrice / selectedDuration.months) : 0;
 
-  // Step validity
+  // ─── Step validity ─────────────────────────────────────────────────────────
   const step1Done = selectedPlan !== null;
-  const step2Done = step1Done;
-  const step3Done = hostname.trim().length >= 3 && customerName.trim().length >= 2
-                 && customerEmail.includes("@") && customerPhone.trim().length >= 8;
+  const step3Done = customerName.trim().length >= 2
+    && customerEmail.includes("@")
+    && customerPhone.trim().length >= 8
+    && (isHosting ? domain.trim().length >= 3 : hostname.trim().length >= 3);
 
   function confirmStep1() {
     if (!step1Done) return;
@@ -174,16 +247,16 @@ export function OrderClient() {
   function handleCheckout() {
     if (!step3Done) return;
     const params = new URLSearchParams({
-      plan:      selectedPlan!.name,
-      duration:  selectedDuration.label,
-      os:        selectedDistro.name,
-      hostname,
-      name:      customerName,
-      email:     customerEmail,
-      phone:     customerPhone,
-      total:     String(totalPrice),
-      months:    String(selectedDuration.months),
-      ip_static: addIpStatic ? "1" : "0",
+      plan:     selectedPlan!.name,
+      duration: selectedDuration.label,
+      os:       isHosting ? "—" : `${selectedDistro.logo} ${selectedDistro.name}`,
+      hostname: isHosting ? domain : hostname,
+      name:     customerName,
+      email:    customerEmail,
+      phone:    customerPhone,
+      total:    String(totalPrice),
+      months:   String(selectedDuration.months),
+      ip_static: (!isHosting && addIpStatic) ? "1" : "0",
     });
     router.push(`/payment?${params.toString()}`);
   }
@@ -194,6 +267,8 @@ export function OrderClient() {
     return "locked";
   }
 
+  const distros = productType === "windows" ? windowsDistros : linuxDistros;
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -203,12 +278,21 @@ export function OrderClient() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-            <span className="hover:text-foreground cursor-pointer" onClick={() => router.back()}>VPS</span>
+            <button className="hover:text-foreground" onClick={() => router.back()}>{back}</button>
             <ChevronRight className="h-3 w-3" />
             <span>Order</span>
           </div>
-          <h1 className="text-3xl font-bold">Konfigurasi Server Anda</h1>
-          <p className="mt-1 text-muted-foreground">Pilih paket, durasi, dan sistem operasi yang sesuai kebutuhan.</p>
+          <h1 className="text-3xl font-bold">{title}</h1>
+          <p className="mt-1 text-muted-foreground">
+            {isHosting
+              ? "Pilih paket dan durasi berlangganan yang sesuai kebutuhan."
+              : "Pilih paket, durasi, dan sistem operasi yang sesuai kebutuhan."}
+          </p>
+          {user && (
+            <p className="mt-2 text-sm text-primary">
+              ✓ Data pemesan diisi otomatis dari akun Anda
+            </p>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -227,7 +311,7 @@ export function OrderClient() {
                 "text-sm font-medium hidden sm:block",
                 stepStatus(n) === "active" ? "text-foreground" : "text-muted-foreground"
               )}>
-                {n === 1 ? "Pilih Paket" : n === 2 ? "Durasi & OS" : "Konfirmasi"}
+                {n === 1 ? "Pilih Paket" : n === 2 ? (isHosting ? "Durasi" : "Durasi & OS") : "Konfirmasi"}
               </span>
               {i < 2 && <div className={cn("h-px flex-1", stepStatus(n) === "done" ? "bg-primary/40" : "bg-border")} />}
             </div>
@@ -241,31 +325,39 @@ export function OrderClient() {
             {/* ── STEP 1: Pilih Paket ───────────────────────────────────── */}
             <Card className={stepStatus(1) === "locked" ? "opacity-40 pointer-events-none" : ""}>
               <CardHeader className="pb-3">
-                <StepHeader
-                  number={1}
-                  label="Pilih Paket"
-                  status={stepStatus(1)}
-                  onEdit={() => setActiveStep(1)}
-                />
+                <StepHeader number={1} label="Pilih Paket" status={stepStatus(1)} onEdit={() => setActiveStep(1)} />
               </CardHeader>
               <CardContent>
                 {activeStep === 1 ? (
                   <div className="space-y-4">
-                    {/* OS toggle */}
-                    <div className="flex rounded-lg border border-border overflow-hidden w-fit">
-                      {(["linux", "windows"] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => { setOsType(type); setSelectedPlan(null); }}
-                          className={cn(
-                            "px-4 py-2 text-sm font-medium transition-colors",
-                            osType === type ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                          )}
-                        >
-                          {type === "linux" ? "🐧 Linux" : "🪟 Windows"}
-                        </button>
-                      ))}
-                    </div>
+                    {/* VPS-only: OS toggle */}
+                    {!isHosting && (
+                      <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+                        {(["linux", "windows"] as const).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => {
+                              router.replace(`/order?type=${type}`);
+                              setSelectedPlan(null);
+                            }}
+                            className={cn(
+                              "px-4 py-2 text-sm font-medium transition-colors",
+                              productType === type ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                            )}
+                          >
+                            {type === "linux" ? "🐧 Linux" : "🪟 Windows"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Plan category label for hosting */}
+                    {isHosting && (
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium text-muted-foreground">{category}</span>
+                      </div>
+                    )}
 
                     {/* Plan list */}
                     <div className="space-y-2">
@@ -290,9 +382,7 @@ export function OrderClient() {
                               </div>
                               <div>
                                 <p className="font-semibold text-sm">{plan.name}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  {plan.cpu} · {plan.ram} RAM · {plan.storage} · {plan.bandwidth}
-                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{plan.spec}</p>
                               </div>
                             </div>
                             <div className="text-right shrink-0 ml-4">
@@ -309,16 +399,15 @@ export function OrderClient() {
                       disabled={!step1Done}
                       className={cn(buttonVariants(), "w-full", !step1Done && "opacity-50 cursor-not-allowed")}
                     >
-                      Lanjut: Pilih Durasi &amp; OS
+                      Lanjut: Pilih Durasi {isHosting ? "" : "& OS"}
                     </button>
                   </div>
                 ) : (
-                  /* Collapsed summary */
                   selectedPlan && (
                     <div className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3 text-sm">
                       <div>
                         <p className="font-semibold">{selectedPlan.name}</p>
-                        <p className="text-xs text-muted-foreground">{selectedPlan.cpu} · {selectedPlan.ram} · {selectedPlan.storage} · {osType === "linux" ? "🐧 Linux" : "🪟 Windows"}</p>
+                        <p className="text-xs text-muted-foreground">{selectedPlan.spec}</p>
                       </div>
                       <p className="font-bold text-primary">Rp {formatRupiah(selectedPlan.basePrice)}/bln</p>
                     </div>
@@ -327,12 +416,12 @@ export function OrderClient() {
               </CardContent>
             </Card>
 
-            {/* ── STEP 2: Durasi & OS ───────────────────────────────────── */}
+            {/* ── STEP 2: Durasi (& OS untuk VPS) ─────────────────────── */}
             <Card className={stepStatus(2) === "locked" ? "opacity-40 pointer-events-none" : ""}>
               <CardHeader className="pb-3">
                 <StepHeader
                   number={2}
-                  label="Durasi & Sistem Operasi"
+                  label={isHosting ? "Durasi Berlangganan" : "Durasi & Sistem Operasi"}
                   status={stepStatus(2)}
                   onEdit={() => setActiveStep(2)}
                 />
@@ -386,62 +475,65 @@ export function OrderClient() {
                       </div>
                     </div>
 
-                    <Separator />
-
-                    {/* OS / Distro */}
-                    <div>
-                      <p className="text-sm font-medium mb-3">Pilih Sistem Operasi</p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        {distros.map((distro) => (
-                          <button
-                            key={distro.id}
-                            onClick={() => setSelectedDistro(distro)}
-                            className={cn(
-                              "flex items-center gap-2 rounded-lg border p-3 text-sm transition-all text-left",
-                              selectedDistro.id === distro.id
-                                ? "border-primary bg-primary/5 ring-1 ring-primary"
-                                : "border-border hover:border-primary/50"
-                            )}
-                          >
-                            <span className="text-xl">{distro.logo}</span>
-                            <span className="font-medium text-xs leading-tight">{distro.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Add-on: IP Public Static */}
-                    <div
-                      onClick={() => setAddIpStatic((v) => !v)}
-                      className={cn(
-                        "flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-all select-none",
-                        addIpStatic
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "border-dashed border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className={cn(
-                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
-                        addIpStatic ? "border-primary bg-primary" : "border-muted-foreground/40"
-                      )}>
-                        {addIpStatic && (
-                          <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <p className="text-sm font-medium">Add-on: IP Public Static</p>
-                          <span className="text-sm font-bold text-primary">
-                            +Rp {formatRupiah(IP_STATIC_MONTHLY * selectedDuration.months)}
-                          </span>
+                    {/* VPS only: OS/distro picker */}
+                    {!isHosting && (
+                      <>
+                        <Separator />
+                        <div>
+                          <p className="text-sm font-medium mb-3">Pilih Sistem Operasi</p>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {distros.map((distro) => (
+                              <button
+                                key={distro.id}
+                                onClick={() => setSelectedDistro(distro)}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-lg border p-3 text-sm transition-all text-left",
+                                  selectedDistro.id === distro.id
+                                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                    : "border-border hover:border-primary/50"
+                                )}
+                              >
+                                <span className="text-xl">{distro.logo}</span>
+                                <span className="font-medium text-xs leading-tight">{distro.name}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Rp {formatRupiah(IP_STATIC_MONTHLY)}/bulan — IP publik statis dedicated untuk server Anda
-                        </p>
-                      </div>
-                    </div>
+
+                        {/* Add-on: IP Static — VPS only */}
+                        <div
+                          onClick={() => setAddIpStatic((v) => !v)}
+                          className={cn(
+                            "flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-all select-none",
+                            addIpStatic
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "border-dashed border-border hover:border-primary/50"
+                          )}
+                        >
+                          <div className={cn(
+                            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                            addIpStatic ? "border-primary bg-primary" : "border-muted-foreground/40"
+                          )}>
+                            {addIpStatic && (
+                              <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <p className="text-sm font-medium">Add-on: IP Public Static</p>
+                              <span className="text-sm font-bold text-primary">
+                                +Rp {formatRupiah(IP_STATIC_MONTHLY * selectedDuration.months)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Rp {formatRupiah(IP_STATIC_MONTHLY)}/bulan — IP publik statis dedicated untuk server Anda
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     <button
                       onClick={confirmStep2}
@@ -451,7 +543,6 @@ export function OrderClient() {
                     </button>
                   </div>
                 ) : (
-                  /* Collapsed summary */
                   maxStep >= 2 && (
                     <div className="grid sm:grid-cols-2 gap-3 text-sm">
                       <div className="rounded-lg bg-muted/30 px-4 py-3">
@@ -461,11 +552,13 @@ export function OrderClient() {
                           <Badge variant="secondary" className="text-xs mt-1">Hemat {selectedDuration.discount}%</Badge>
                         )}
                       </div>
-                      <div className="rounded-lg bg-muted/30 px-4 py-3">
-                        <p className="text-xs text-muted-foreground mb-1">Sistem Operasi</p>
-                        <p className="font-semibold">{selectedDistro.logo} {selectedDistro.name}</p>
-                      </div>
-                      {addIpStatic && (
+                      {!isHosting && (
+                        <div className="rounded-lg bg-muted/30 px-4 py-3">
+                          <p className="text-xs text-muted-foreground mb-1">Sistem Operasi</p>
+                          <p className="font-semibold">{selectedDistro.logo} {selectedDistro.name}</p>
+                        </div>
+                      )}
+                      {!isHosting && addIpStatic && (
                         <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 sm:col-span-2">
                           <p className="text-xs text-muted-foreground mb-1">Add-on</p>
                           <p className="font-semibold text-primary">IP Public Static (+Rp {formatRupiah(IP_STATIC_MONTHLY)}/bln)</p>
@@ -480,20 +573,24 @@ export function OrderClient() {
             {/* ── STEP 3: Konfirmasi + Info Pemesan ────────────────────── */}
             <Card className={stepStatus(3) === "locked" ? "opacity-40 pointer-events-none" : ""}>
               <CardHeader className="pb-3">
-                <StepHeader
-                  number={3}
-                  label="Info Pemesan & Konfirmasi"
-                  status={stepStatus(3)}
-                />
+                <StepHeader number={3} label="Info Pemesan & Konfirmasi" status={stepStatus(3)} />
               </CardHeader>
               <CardContent>
                 {activeStep === 3 || maxStep >= 3 ? (
                   <div className="space-y-5">
-                    {/* Customer info */}
                     <div>
-                      <p className="text-sm font-semibold mb-3">Data Pemesan</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold">Data Pemesan</p>
+                        {user && (
+                          <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                            Diisi dari akun
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground mb-4">
-                        Isi data di bawah untuk mengirimkan informasi server dan tagihan. Tidak perlu daftar akun untuk saat ini.
+                        {user
+                          ? "Data diambil dari akun Anda. Ubah jika diperlukan."
+                          : "Isi data di bawah untuk mengirimkan informasi dan tagihan."}
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
@@ -525,24 +622,41 @@ export function OrderClient() {
                             placeholder="john@example.com"
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           />
-                          <p className="text-xs text-muted-foreground">Info server dan invoice akan dikirim ke email ini.</p>
+                          <p className="text-xs text-muted-foreground">Info layanan dan invoice akan dikirim ke email ini.</p>
                         </div>
-                        <div className="space-y-1 sm:col-span-2">
-                          <label className="text-sm font-medium">Hostname Server <span className="text-destructive">*</span></label>
-                          <input
-                            type="text"
-                            value={hostname}
-                            onChange={(e) => setHostname(e.target.value)}
-                            placeholder="contoh: server-web-produksi"
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          />
-                        </div>
+
+                        {/* Hostname (VPS) atau Domain (Hosting) */}
+                        {isHosting ? (
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-sm font-medium">Nama Domain <span className="text-destructive">*</span></label>
+                            <input
+                              type="text"
+                              value={domain}
+                              onChange={(e) => setDomain(e.target.value)}
+                              placeholder="contoh: namadomain.com"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                            <p className="text-xs text-muted-foreground">Domain yang akan diarahkan ke hosting ini.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-sm font-medium">Hostname Server <span className="text-destructive">*</span></label>
+                            <input
+                              type="text"
+                              value={hostname}
+                              onChange={(e) => setHostname(e.target.value)}
+                              placeholder="contoh: server-web-produksi"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          </div>
+                        )}
+
                         <div className="space-y-1 sm:col-span-2">
                           <label className="text-sm font-medium">Catatan <span className="text-muted-foreground font-normal">(opsional)</span></label>
                           <textarea
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
-                            placeholder="Misalnya: butuh IP tambahan, konfigurasi khusus, dll."
+                            placeholder={isHosting ? "Misalnya: butuh migrasi dari hosting lain, CMS yang digunakan, dll." : "Misalnya: butuh IP tambahan, konfigurasi khusus, dll."}
                             rows={2}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
                           />
@@ -556,12 +670,13 @@ export function OrderClient() {
                     <div className="rounded-lg bg-muted/30 p-4 space-y-2 text-sm">
                       <p className="font-semibold">Ringkasan Pesanan</p>
                       {[
-                        ["Paket",       selectedPlan?.name ?? "—"],
-                        ["Spesifikasi", selectedPlan ? `${selectedPlan.cpu} · ${selectedPlan.ram} · ${selectedPlan.storage}` : "—"],
-                        ["OS",         `${selectedDistro.logo} ${selectedDistro.name}`],
+                        ["Produk",     category],
+                        ["Paket",      selectedPlan?.name ?? "—"],
+                        ["Spesifikasi", selectedPlan?.spec ?? "—"],
+                        ...(!isHosting ? [["OS", `${selectedDistro.logo} ${selectedDistro.name}`]] : []),
                         ["Durasi",     selectedDuration.label],
-                        ["IP Static",  addIpStatic ? `Ya (+Rp ${formatRupiah(IP_STATIC_MONTHLY)}/bln)` : "Tidak"],
-                        ["Hostname",   hostname || "—"],
+                        ...(!isHosting && addIpStatic ? [["IP Static", `Ya (+Rp ${formatRupiah(IP_STATIC_MONTHLY)}/bln)`]] : []),
+                        [isHosting ? "Domain" : "Hostname", isHosting ? (domain || "—") : (hostname || "—")],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between">
                           <span className="text-muted-foreground">{k}</span>
@@ -598,7 +713,7 @@ export function OrderClient() {
             </Card>
           </div>
 
-          {/* ── Right: sticky summary ────────────────────────────────── */}
+          {/* ── Right: sticky summary ─────────────────────────────────── */}
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-4">
               <Card>
@@ -626,16 +741,18 @@ export function OrderClient() {
                             <span>- Rp {formatRupiah(totalDiscount)}</span>
                           </div>
                         )}
-                        {addIpStatic && (
+                        {!isHosting && addIpStatic && (
                           <div className="flex justify-between text-primary">
                             <span>IP Public Static</span>
                             <span>+ Rp {formatRupiah(ipStaticTotal)}</span>
                           </div>
                         )}
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>OS</span>
-                          <span className="text-xs text-right">{selectedDistro.name}</span>
-                        </div>
+                        {!isHosting && (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>OS</span>
+                            <span className="text-xs text-right">{selectedDistro.name}</span>
+                          </div>
+                        )}
                       </div>
 
                       <Separator />

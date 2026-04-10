@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -32,8 +33,13 @@ type RegisterForm = z.infer<typeof registerSchema>;
 const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function RegisterPage() {
-  const { register: registerUser } = useAuth();
+  const { register: registerUser, user, isLoading } = useAuth();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) router.replace("/dashboard");
+  }, [user, isLoading, router]);
   const [cfToken, setCfToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

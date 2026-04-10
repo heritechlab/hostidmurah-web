@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Turnstile } from "@/components/ui/turnstile";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
-import type { Metadata } from "next";
 
 const loginSchema = z.object({
   email: z.string().email("Email tidak valid"),
@@ -24,8 +24,13 @@ type LoginForm = z.infer<typeof loginSchema>;
 const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) router.replace("/dashboard");
+  }, [user, isLoading, router]);
   const [cfToken, setCfToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
