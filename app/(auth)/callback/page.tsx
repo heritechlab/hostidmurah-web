@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { setStoredAuth, type User } from "@/lib/auth";
 
-export default function CallbackPage() {
+function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,7 +26,6 @@ export default function CallbackPage() {
       return;
     }
 
-    // Fetch user info dengan token
     api
       .get<User>("/auth/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -46,5 +45,20 @@ export default function CallbackPage() {
       <Loader2 className="size-8 animate-spin text-primary" />
       <p className="text-sm">Memverifikasi akun Google...</p>
     </div>
+  );
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-sm">Memuat...</p>
+        </div>
+      }
+    >
+      <CallbackHandler />
+    </Suspense>
   );
 }
