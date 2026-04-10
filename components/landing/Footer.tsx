@@ -1,0 +1,80 @@
+import Link from "next/link";
+import { Server } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+
+const footerLinks = {
+  Produk: [
+    { title: "Cloud VPS Linux", href: "/vps" },
+    { title: "Cloud VPS Windows", href: "/vps?type=windows" },
+    { title: "Dedicated Server", href: "/dedicated" },
+    { title: "Semua Harga", href: "/pricing" },
+  ],
+  Perusahaan: [
+    { title: "Tentang Kami", href: "/about" },
+    { title: "Fitur Unggulan", href: "/features" },
+    { title: "Blog", href: "/blog" },
+    { title: "Kontak", href: "/contact" },
+  ],
+  Bantuan: [
+    { title: "Dokumentasi", href: "/docs" },
+    { title: "Status Server", href: "https://status.hostidmurah.web.id" },
+    { title: "Kebijakan Privasi", href: "/privacy" },
+    { title: "Syarat & Ketentuan", href: "/terms" },
+  ],
+};
+
+export function Footer() {
+  return (
+    <footer className="border-t border-border bg-muted/30">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Brand */}
+          <div className="space-y-4">
+            <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
+              <Server className="h-5 w-5" />
+              HostIDMurah
+            </Link>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Solusi hosting VPS dan dedicated server terpercaya di Indonesia. Uptime 99.9%, proteksi DDoS, dan support 24/7.
+            </p>
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                Semua sistem normal
+              </span>
+            </div>
+          </div>
+
+          {/* Links */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category} className="space-y-4">
+              <h3 className="text-sm font-semibold">{category}</h3>
+              <ul className="space-y-2">
+                {links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {link.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <Separator className="my-8" />
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <p>© {new Date().getFullYear()} HostIDMurah. Hak cipta dilindungi.</p>
+          <div className="flex items-center gap-4">
+            <span>WhatsApp: +62 812-XXXX-XXXX</span>
+            <span>Email: support@hostidmurah.web.id</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
