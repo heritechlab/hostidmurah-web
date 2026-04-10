@@ -70,7 +70,7 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} HostIDMurah. Hak cipta dilindungi.</p>
           <div className="flex items-center gap-4">
-            <span>WhatsApp: +62 812-XXXX-XXXX</span>
+            <span>WhatsApp: +62 852-1234-8518</span>
             <span>Email: support@hostidmurah.web.id</span>
           </div>
         </div>

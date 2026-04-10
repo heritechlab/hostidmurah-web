@@ -82,7 +82,7 @@ export default function Home() {
               <h2 className="text-3xl font-bold md:text-4xl">Paket VPS Terpopuler</h2>
               <p className="mt-4 text-muted-foreground">Pilih paket yang sesuai dengan kebutuhan Anda</p>
             </div>
-            <div className="grid gap-8 md:grid-cols-3">
+            <div className="grid gap-8 md:grid-cols-3 pt-5">
               {plans.map((plan) => (
                 <Card
                   key={plan.name}
