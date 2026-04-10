@@ -4,8 +4,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Navbar } from "@/components/landing/navbar";
-import { Footer } from "@/components/landing/footer";
+import { Navbar } from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
 
 const stats = [
   { value: "99.9%", label: "Uptime SLA" },

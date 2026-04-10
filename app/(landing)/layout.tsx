@@ -1,5 +1,5 @@
-import { Navbar } from "@/components/landing/navbar";
-import { Footer } from "@/components/landing/footer";
+import { Navbar } from "@/components/landing/Navbar";
+import { Footer } from "@/components/landing/Footer";
 import { WhatsAppButton } from "@/components/landing/WhatsAppButton";
 
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
