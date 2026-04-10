@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# Database
+*.db
+*.sqlite3
+
+# Alembic (keep ini + versions, ignore __pycache__)
+alembic/__pycache__/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
