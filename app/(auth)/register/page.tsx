@@ -74,17 +74,16 @@ export default function RegisterPage() {
   const handleExpire = useCallback(() => setCfToken(null), []);
 
   return (
-    <div className="w-full max-w-sm">
-      <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold">Buat Akun</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sudah punya akun?{" "}
-            <Link href="/login" className="text-primary hover:underline font-medium">
-              Masuk
-            </Link>
-          </p>
-        </div>
+    <div className="w-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Buat Akun Gratis</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sudah punya akun?{" "}
+          <Link href="/login" className="text-primary hover:underline font-medium">
+            Masuk
+          </Link>
+        </p>
+      </div>
 
         {/* Google OAuth */}
         <a
@@ -109,7 +108,7 @@ export default function RegisterPage() {
             <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-card px-2 text-muted-foreground">atau dengan email</span>
+            <span className="bg-background px-2 text-muted-foreground">atau dengan email</span>
           </div>
         </div>
 
@@ -234,7 +233,6 @@ export default function RegisterPage() {
           </Link>{" "}
           kami.
         </p>
-      </div>
     </div>
   );
 }

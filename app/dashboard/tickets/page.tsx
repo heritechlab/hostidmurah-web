@@ -110,7 +110,7 @@ export default function TicketsPage() {
             Buka Tiket
           </Button>
           <a
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WA_NUMBER ?? "6281234567890"}`}
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_WA_NUMBER ?? "6285212348518"}`}
             target="_blank"
             rel="noopener noreferrer"
             className={cn(

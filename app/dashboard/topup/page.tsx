@@ -131,7 +131,7 @@ export default function TopupPage() {
               Setelah transfer, saldo akan otomatis ditambahkan dalam 5–15 menit. Atau konfirmasi
               via{" "}
               <a
-                href={`https://wa.me/${process.env.NEXT_PUBLIC_WA_NUMBER ?? "6281234567890"}?text=Konfirmasi+topup+Rp+${Number(amount).toLocaleString("id-ID")}`}
+                href={`https://wa.me/${process.env.NEXT_PUBLIC_WA_NUMBER ?? "6285212348518"}?text=Konfirmasi+topup+Rp+${Number(amount).toLocaleString("id-ID")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"

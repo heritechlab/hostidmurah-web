@@ -24,9 +24,9 @@ const features = [
 ];
 
 const plans = [
-  { name: "VPS Starter", price: "49.000", specs: ["1 vCPU", "1 GB RAM", "25 GB SSD NVMe", "1 TB Bandwidth"], popular: false },
-  { name: "VPS Business", price: "99.000", specs: ["2 vCPU", "4 GB RAM", "80 GB SSD NVMe", "3 TB Bandwidth"], popular: true },
-  { name: "VPS Professional", price: "199.000", specs: ["4 vCPU", "8 GB RAM", "160 GB SSD NVMe", "5 TB Bandwidth"], popular: false },
+  { id: "vps-l-s", name: "VPS Starter",      price: "49.000",  specs: ["1 vCPU", "1 GB RAM", "25 GB SSD NVMe", "1 TB Bandwidth"],  popular: false },
+  { id: "vps-l-m", name: "VPS Business",      price: "99.000",  specs: ["2 vCPU", "4 GB RAM", "80 GB SSD NVMe", "3 TB Bandwidth"],  popular: true },
+  { id: "vps-l-l", name: "VPS Professional",  price: "199.000", specs: ["4 vCPU", "8 GB RAM", "160 GB SSD NVMe", "5 TB Bandwidth"], popular: false },
 ];
 
 const testimonials = [
@@ -113,7 +113,7 @@ export default function Home() {
                       ))}
                     </ul>
                     <Link
-                      href="/order"
+                      href={`/order?plan=${plan.id}&type=linux`}
                       className={cn(buttonVariants({ variant: plan.popular ? "default" : "outline" }), "w-full")}
                     >
                       Order Sekarang

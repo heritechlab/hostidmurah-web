@@ -111,6 +111,7 @@ export function OrderClient() {
   const [selectedPlan, setSelectedPlan]   = useState<Plan | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<Duration>(durations[0]);
   const [selectedDistro, setSelectedDistro]     = useState<Distro>(linuxDistros[0]);
+  const [addIpStatic, setAddIpStatic]     = useState(false);
   const [hostname, setHostname]           = useState("");
   const [customerName, setCustomerName]   = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -145,10 +146,12 @@ export function OrderClient() {
   }, [osType]);
 
   // Price calculation
+  const IP_STATIC_MONTHLY   = 100000;
   const monthlyPrice        = selectedPlan?.basePrice ?? 0;
   const totalBeforeDiscount = monthlyPrice * selectedDuration.months;
   const totalDiscount       = Math.round(totalBeforeDiscount * selectedDuration.discount / 100);
-  const totalPrice          = totalBeforeDiscount - totalDiscount;
+  const ipStaticTotal       = addIpStatic ? IP_STATIC_MONTHLY * selectedDuration.months : 0;
+  const totalPrice          = totalBeforeDiscount - totalDiscount + ipStaticTotal;
   const effectiveMonthly    = selectedDuration.months > 0 ? Math.round(totalPrice / selectedDuration.months) : 0;
 
   // Step validity
@@ -171,15 +174,16 @@ export function OrderClient() {
   function handleCheckout() {
     if (!step3Done) return;
     const params = new URLSearchParams({
-      plan:     selectedPlan!.name,
-      duration: selectedDuration.label,
-      os:       selectedDistro.name,
+      plan:      selectedPlan!.name,
+      duration:  selectedDuration.label,
+      os:        selectedDistro.name,
       hostname,
-      name:     customerName,
-      email:    customerEmail,
-      phone:    customerPhone,
-      total:    String(totalPrice),
-      months:   String(selectedDuration.months),
+      name:      customerName,
+      email:     customerEmail,
+      phone:     customerPhone,
+      total:     String(totalPrice),
+      months:    String(selectedDuration.months),
+      ip_static: addIpStatic ? "1" : "0",
     });
     router.push(`/payment?${params.toString()}`);
   }
@@ -406,6 +410,39 @@ export function OrderClient() {
                       </div>
                     </div>
 
+                    {/* Add-on: IP Public Static */}
+                    <div
+                      onClick={() => setAddIpStatic((v) => !v)}
+                      className={cn(
+                        "flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-all select-none",
+                        addIpStatic
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-dashed border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                        addIpStatic ? "border-primary bg-primary" : "border-muted-foreground/40"
+                      )}>
+                        {addIpStatic && (
+                          <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-sm font-medium">Add-on: IP Public Static</p>
+                          <span className="text-sm font-bold text-primary">
+                            +Rp {formatRupiah(IP_STATIC_MONTHLY * selectedDuration.months)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Rp {formatRupiah(IP_STATIC_MONTHLY)}/bulan — IP publik statis dedicated untuk server Anda
+                        </p>
+                      </div>
+                    </div>
+
                     <button
                       onClick={confirmStep2}
                       className={cn(buttonVariants(), "w-full")}
@@ -428,6 +465,12 @@ export function OrderClient() {
                         <p className="text-xs text-muted-foreground mb-1">Sistem Operasi</p>
                         <p className="font-semibold">{selectedDistro.logo} {selectedDistro.name}</p>
                       </div>
+                      {addIpStatic && (
+                        <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 sm:col-span-2">
+                          <p className="text-xs text-muted-foreground mb-1">Add-on</p>
+                          <p className="font-semibold text-primary">IP Public Static (+Rp {formatRupiah(IP_STATIC_MONTHLY)}/bln)</p>
+                        </div>
+                      )}
                     </div>
                   )
                 )}
@@ -517,6 +560,7 @@ export function OrderClient() {
                         ["Spesifikasi", selectedPlan ? `${selectedPlan.cpu} · ${selectedPlan.ram} · ${selectedPlan.storage}` : "—"],
                         ["OS",         `${selectedDistro.logo} ${selectedDistro.name}`],
                         ["Durasi",     selectedDuration.label],
+                        ["IP Static",  addIpStatic ? `Ya (+Rp ${formatRupiah(IP_STATIC_MONTHLY)}/bln)` : "Tidak"],
                         ["Hostname",   hostname || "—"],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between">
@@ -580,6 +624,12 @@ export function OrderClient() {
                           <div className="flex justify-between text-green-600 dark:text-green-400">
                             <span>Diskon {selectedDuration.discount}%</span>
                             <span>- Rp {formatRupiah(totalDiscount)}</span>
+                          </div>
+                        )}
+                        {addIpStatic && (
+                          <div className="flex justify-between text-primary">
+                            <span>IP Public Static</span>
+                            <span>+ Rp {formatRupiah(ipStaticTotal)}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-muted-foreground">

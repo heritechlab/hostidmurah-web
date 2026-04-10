@@ -13,9 +13,9 @@ const contacts = [
   {
     icon: MessageCircle,
     title: "WhatsApp",
-    value: "+62 812-XXXX-XXXX",
+    value: "+62 852-1234-8518",
     description: "Respon cepat, tersedia 24/7",
-    href: "https://wa.me/62812XXXXXXXX",
+    href: "https://wa.me/6285212348518",
   },
   {
     icon: Mail,

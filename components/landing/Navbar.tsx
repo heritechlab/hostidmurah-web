@@ -25,7 +25,7 @@ const serverProducts = [
   },
   {
     title: "Cloud VPS Windows",
-    href: "/vps?type=windows",
+    href: "/vps/windows",
     description: "VPS Windows Server siap pakai untuk kebutuhan bisnis Anda.",
   },
   {

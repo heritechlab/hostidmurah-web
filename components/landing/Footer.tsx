@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 const footerLinks = {
   Produk: [
     { title: "Cloud VPS Linux", href: "/vps" },
-    { title: "Cloud VPS Windows", href: "/vps?type=windows" },
+    { title: "Cloud VPS Windows", href: "/vps/windows" },
     { title: "Dedicated Server", href: "/dedicated" },
     { title: "Semua Harga", href: "/pricing" },
   ],
@@ -70,8 +70,8 @@ export function Footer() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} HostIDMurah. Hak cipta dilindungi.</p>
           <div className="flex items-center gap-4">
-            <span>WhatsApp: +62 852-1234-8518</span>
-            <span>Email: support@hostidmurah.web.id</span>
+            <a href="https://wa.me/6285212348518" className="hover:text-foreground transition-colors">WhatsApp: +62 852-1234-8518</a>
+            <a href="mailto:support@hostidmurah.web.id" className="hover:text-foreground transition-colors">Email: support@hostidmurah.web.id</a>
           </div>
         </div>
       </div>

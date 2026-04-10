@@ -266,7 +266,7 @@ export function PaymentClient() {
                         <li>Transfer tepat sesuai nominal di atas (kode unik membantu verifikasi otomatis)</li>
                         <li>Gunakan berita: <span className="font-mono font-semibold">{orderId}</span></li>
                         <li>Server aktif dalam 5 menit setelah pembayaran terverifikasi</li>
-                        <li>Konfirmasi via WhatsApp: <span className="font-semibold">+62 812-XXXX-XXXX</span></li>
+                        <li>Konfirmasi via WhatsApp: <span className="font-semibold">+62 852-1234-8518</span></li>
                       </ul>
                     </div>
 
@@ -454,7 +454,7 @@ export function PaymentClient() {
                   Tim support siap membantu konfirmasi pembayaran Anda.
                 </p>
                 <a
-                  href={`https://wa.me/62812XXXXXXXX?text=Halo, saya sudah bayar order ${orderId}`}
+                  href={`https://wa.me/6285212348518?text=Halo, saya sudah bayar order ${orderId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}
