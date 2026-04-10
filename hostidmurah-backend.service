@@ -1,0 +1,18 @@
+[Unit]
+Description=HostIDMurah Backend (FastAPI)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntussd
+WorkingDirectory=/www/wwwroot/hostidmurah-backend
+ExecStart=/home/ubuntussd/.local/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hostidmurah-backend
+
+[Install]
+WantedBy=multi-user.target
