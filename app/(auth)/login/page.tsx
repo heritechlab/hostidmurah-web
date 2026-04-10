@@ -21,7 +21,7 @@ const loginSchema = z.object({
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
-const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google`;
+const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function LoginPage() {
   const { login } = useAuth();

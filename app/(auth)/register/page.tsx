@@ -29,7 +29,7 @@ const registerSchema = z
   });
 type RegisterForm = z.infer<typeof registerSchema>;
 
-const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google`;
+const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
