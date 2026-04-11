@@ -523,7 +523,7 @@ async def list_packages(
     query = select(VPSPackage)
     if active_only:
         query = query.where(VPSPackage.is_active == True)
-    query = query.order_by(VPSorder.price_paid)
+    query = query.order_by(VPSPackage.price_monthly)
     
     result = await db.execute(query)
     packages = result.scalars().all()
@@ -569,7 +569,7 @@ async def create_order(
         billing_cycle = 1
  
     discount_pct = BILLING_DISCOUNTS[billing_cycle]
-    monthly_price = order.price_paid
+    monthly_price = package.price_monthly
     discounted_monthly = int(monthly_price * (1 - Decimal(discount_pct) / 100))
     total_price = Decimal(discounted_monthly) * billing_cycle
     duration_days = billing_cycle * 30
@@ -967,11 +967,12 @@ async def process_referral_bonus(user: User, db: AsyncSession):
 @api_router.post("/payment/simulate")
 async def simulate_payment(
     reference: str,
+    admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    [DEV ONLY] Simulate payment success for testing
-    This endpoint should be disabled in production
+    [DEV ONLY] Simulate payment success for testing.
+    Requires admin authentication.
     """
     result = await db.execute(
         select(Transaction).where(Transaction.reference_id == reference)
@@ -1283,7 +1284,7 @@ async def admin_assign_vps(
         expired_at = datetime.fromisoformat(data["expired_at"])
     
     # Custom price or package price
-    price = Decimal(str(data.get("custom_price", order.price_paid)))
+    price = Decimal(str(data.get("custom_price", package.price_monthly)))
     
     order = VPSOrder(
         user_id=user.id,
@@ -1315,10 +1316,10 @@ async def admin_assign_vps(
         package.name,
         float(price),
         expired_at,
-        original_price=float(order.price_paid) if int(order.price_paid) != int(price) else None,
+        original_price=float(package.price_monthly) if int(package.price_monthly) != int(price) else None,
         is_renewal=False
     )
-    
+
     return {
         "message": "VPS berhasil diassign ke user",
         "order_id": str(order.id),
@@ -1790,7 +1791,7 @@ async def admin_process_topup_request(
                         await send_order_created_email(
                             user.email, user.name, package.name,
                             float(order.price_paid), order.expired_at,
-                            original_price=float(order.price_paid) if int(order.price_paid) != int(order.price_paid) else None,
+                            original_price=None,
                             is_renewal=True
                         )
 
@@ -2276,7 +2277,7 @@ async def admin_notify_order_email(
     await send_order_created_email(
          user.email, user.name, package_name,
          float(order.price_paid), order.expired_at,
-         original_price=float(order.price_paid) if package and int(order.price_paid) != int(order.price_paid) else None,
+         original_price=None,
          is_renewal=True
     )
 
@@ -2382,8 +2383,9 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token({"sub": str(user.id)})
 
-    # Redirect ke frontend dengan token
-    redirect_url = f"{FRONTEND_URL}/auth/callback?access_token={access_token}&refresh_token={refresh_token}"
+    # Redirect ke frontend dengan token via URL fragment (#)
+    # Fragment tidak dikirim ke server/tidak masuk access log/browser history
+    redirect_url = f"{FRONTEND_URL}/auth/callback#access_token={access_token}&refresh_token={refresh_token}"
     return RedirectResponse(url=redirect_url)
 # ==================== END GOOGLE OAUTH ====================
 
