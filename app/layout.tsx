@@ -14,6 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Cache singkat sementara masih banyak perubahan aktif — kembalikan ke nilai
+// lebih panjang (atau hapus) setelah development mereda.
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: {
     default: "HostIDMurah - Hosting VPS Indonesia Terpercaya",
