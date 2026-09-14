@@ -3,9 +3,41 @@ import { NextResponse, type NextRequest } from "next/server";
 const PROTECTED = ["/dashboard"];
 const AUTH_ONLY = ["/login", "/register"];
 
+const ADMIN_HOST_PREFIX = "admin.";
+const ADMIN_AUTH_ONLY = ["/login"];
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = (request.headers.get("host") ?? "").split(":")[0];
   const token = request.cookies.get("auth_token")?.value;
+  const isAdminHost = hostname.startsWith(ADMIN_HOST_PREFIX);
+
+  if (isAdminHost) {
+    // Halaman /admin/* hanya boleh diakses lewat subdomain admin, bukan domain utama
+    if (pathname.startsWith("/admin")) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    const isAdminAuthOnly = ADMIN_AUTH_ONLY.some((p) => pathname.startsWith(p));
+
+    if (!isAdminAuthOnly && !token) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    if (isAdminAuthOnly && token) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    // Rewrite semua path di subdomain admin ke namespace /admin/* secara internal
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = pathname === "/" ? "/admin" : `/admin${pathname}`;
+    return NextResponse.rewrite(rewriteUrl);
+  }
+
+  // Domain utama: blokir akses langsung ke namespace /admin/*
+  if (pathname.startsWith("/admin")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
   const isProtected = PROTECTED.some((p) => pathname.startsWith(p));
   const isAuthOnly = AUTH_ONLY.some((p) => pathname.startsWith(p));
@@ -27,5 +59,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|uploads).*)"],
 };

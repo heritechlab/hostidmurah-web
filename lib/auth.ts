@@ -5,6 +5,8 @@ export interface User {
   phone?: string;
   balance: number;
   referral_code?: string;
+  role?: string;
+  is_active?: boolean;
   created_at?: string;
 }
 
