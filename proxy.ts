@@ -13,25 +13,33 @@ export function proxy(request: NextRequest) {
   const isAdminHost = hostname.startsWith(ADMIN_HOST_PREFIX);
 
   if (isAdminHost) {
+    // Subdomain admin tidak boleh pernah di-cache CDN — path yang sama persis
+    // dengan domain utama (mis. "/") bisa ke-serve dari cache domain utama
+    // kalau tidak dipaksa no-store di sini.
+    const noStore = (res: NextResponse) => {
+      res.headers.set("Cache-Control", "no-store, must-revalidate");
+      return res;
+    };
+
     // Halaman /admin/* hanya boleh diakses lewat subdomain admin, bukan domain utama
     if (pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return noStore(NextResponse.redirect(new URL("/", request.url)));
     }
 
     const isAdminAuthOnly = ADMIN_AUTH_ONLY.some((p) => pathname.startsWith(p));
 
     if (!isAdminAuthOnly && !token) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return noStore(NextResponse.redirect(new URL("/login", request.url)));
     }
 
     if (isAdminAuthOnly && token) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return noStore(NextResponse.redirect(new URL("/", request.url)));
     }
 
     // Rewrite semua path di subdomain admin ke namespace /admin/* secara internal
     const rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname = pathname === "/" ? "/admin" : `/admin${pathname}`;
-    return NextResponse.rewrite(rewriteUrl);
+    return noStore(NextResponse.rewrite(rewriteUrl));
   }
 
   // Domain utama: blokir akses langsung ke namespace /admin/*
