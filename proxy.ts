@@ -12,6 +12,16 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth_token")?.value;
   const isAdminHost = hostname.startsWith(ADMIN_HOST_PREFIX);
 
+  if (pathname === "/__debug-host") {
+    return NextResponse.json({
+      hostHeader: request.headers.get("host"),
+      xForwardedHost: request.headers.get("x-forwarded-host"),
+      cfConnectingIp: request.headers.get("cf-connecting-ip"),
+      isAdminHost,
+      url: request.url,
+    }, { headers: { "Cache-Control": "no-store" } });
+  }
+
   if (isAdminHost) {
     // Subdomain admin tidak boleh pernah di-cache CDN — path yang sama persis
     // dengan domain utama (mis. "/") bisa ke-serve dari cache domain utama
