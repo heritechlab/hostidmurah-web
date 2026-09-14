@@ -102,6 +102,7 @@ class VPSPackage(Base):
     server_type = Column(String, default="vps")  # vps | dedicated
     os_type = Column(String, default="linux")    # linux | windows
     ip_type = Column(String, default="shared")   # shared | dedicated
+    os_options = Column(Text, nullable=True)     # daftar OS didukung, dipisah koma
     price_monthly = Column(Numeric(15, 2), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

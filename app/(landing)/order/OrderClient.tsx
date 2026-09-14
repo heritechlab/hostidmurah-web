@@ -57,7 +57,7 @@ const windowsDistros = [
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ProductType = "linux" | "windows" | "hosting-shared" | "hosting-wordpress" | "hosting-cloud";
-type Plan = { id: string; name: string; basePrice: number; spec: string; dbId?: number };
+type Plan = { id: string; name: string; basePrice: number; spec: string; dbId?: number; osOptions?: string };
 type Duration = typeof durations[0];
 type Distro = typeof linuxDistros[0];
 
@@ -71,6 +71,7 @@ interface DbPackage {
   price_monthly: number;
   os_type?: string;
   server_type?: string;
+  os_options?: string;
 }
 
 interface PaymentMethod {
@@ -194,6 +195,7 @@ export function OrderClient() {
       name: p.name,
       basePrice: p.price_monthly,
       spec: `${p.cpu} · ${p.ram} · ${p.storage}`,
+      osOptions: p.os_options,
     }));
 
   const plans = isVps ? vpsPlans : staticPlansForType(productType);
@@ -376,7 +378,27 @@ export function OrderClient() {
     return "locked";
   }
 
-  const distros = productType === "windows" ? windowsDistros : linuxDistros;
+  const fallbackDistros = productType === "windows" ? windowsDistros : linuxDistros;
+  const customOsNames = selectedPlan?.osOptions
+    ?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const distros: Distro[] = customOsNames && customOsNames.length > 0
+    ? customOsNames.map((name) => ({
+        id: name.toLowerCase().replace(/\s+/g, "-"),
+        name,
+        logo: productType === "windows" ? "🪟" : "🐧",
+      }))
+    : fallbackDistros;
+
+  // Paket bisa punya daftar OS sendiri (diatur admin) — pastikan pilihan OS
+  // selalu valid untuk paket yang sedang dipilih.
+  useEffect(() => {
+    if (distros.length > 0 && !distros.some((d) => d.id === selectedDistro.id)) {
+      setSelectedDistro(distros[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPlan?.id]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 

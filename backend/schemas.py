@@ -99,6 +99,7 @@ class VPSPackageCreate(BaseModel):
     server_type: str = "vps"
     os_type: str = "linux"
     ip_type: str = "shared"
+    os_options: Optional[str] = None
 
 
 class VPSPackageUpdate(BaseModel):
@@ -113,11 +114,12 @@ class VPSPackageUpdate(BaseModel):
     server_type: str = "vps"
     os_type: str = "linux"
     ip_type: Optional[str] = "shared"
+    os_options: Optional[str] = None
 
 
 class VPSPackageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: int
     name: str
     description: Optional[str] = None
@@ -131,6 +133,7 @@ class VPSPackageResponse(BaseModel):
     server_type: Optional[str] = "vps"
     os_type: Optional[str] = "linux"
     ip_type: Optional[str] = "shared"
+    os_options: Optional[str] = None
 
 
 # VPS Order Schemas

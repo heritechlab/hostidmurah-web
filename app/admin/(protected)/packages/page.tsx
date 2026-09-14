@@ -40,6 +40,7 @@ interface VPSPackage {
   server_type?: string;
   os_type?: string;
   ip_type?: string;
+  os_options?: string;
   created_at: string;
 }
 
@@ -228,6 +229,7 @@ function PackageFormDialogBody({
   const [serverType, setServerType] = useState(pkg?.server_type ?? "vps");
   const [osType, setOsType] = useState(pkg?.os_type ?? "linux");
   const [ipType, setIpType] = useState(pkg?.ip_type ?? "shared");
+  const [osOptions, setOsOptions] = useState(pkg?.os_options ?? "");
   const [isActive, setIsActive] = useState(pkg?.is_active ?? true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -242,6 +244,7 @@ function PackageFormDialogBody({
     setServerType(pkg?.server_type ?? "vps");
     setOsType(pkg?.os_type ?? "linux");
     setIpType(pkg?.ip_type ?? "shared");
+    setOsOptions(pkg?.os_options ?? "");
     setIsActive(pkg?.is_active ?? true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg?.id]);
@@ -266,6 +269,7 @@ function PackageFormDialogBody({
         server_type: serverType,
         os_type: osType,
         ip_type: ipType,
+        os_options: osOptions || undefined,
       };
       if (mode === "create") {
         await api.post("/admin/packages", payload);
@@ -359,6 +363,22 @@ function PackageFormDialogBody({
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Pilihan Sistem Operasi</Label>
+          <Textarea
+            value={osOptions}
+            onChange={(e) => setOsOptions(e.target.value)}
+            placeholder={
+              osType === "windows"
+                ? "cth. Windows Server 2022, Windows Server 2019, Windows 10 Pro"
+                : "cth. Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Debian 12, AlmaLinux 9"
+            }
+            rows={2}
+          />
+          <p className="text-xs text-muted-foreground">
+            Pisahkan dengan koma. Ini yang akan muncul sebagai pilihan OS saat pelanggan order paket ini. Kosongkan untuk pakai daftar default.
+          </p>
         </div>
         {mode === "edit" && (
           <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
