@@ -423,7 +423,9 @@ function UpdateStatusDialogBody({ order, onDone }: { order: AdminOrder | null; o
           <Label>Status</Label>
           <Select value={status} onValueChange={(v) => setStatus(v as string)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Pilih status" />
+              <SelectValue placeholder="Pilih status">
+                {(v: string) => STATUS_OPTIONS.find((opt) => opt.value === v)?.label ?? "Pilih status"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((opt) => (

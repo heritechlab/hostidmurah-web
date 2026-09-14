@@ -271,7 +271,9 @@ function PaymentMethodDialogBody({
           <Label>Tipe</Label>
           <Select value={type} onValueChange={(v) => setType(v as string)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Pilih tipe" />
+              <SelectValue placeholder="Pilih tipe">
+                {(v: string) => (v === "bank" ? "Bank" : v === "ewallet" ? "E-Wallet" : "Pilih tipe")}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="bank">Bank</SelectItem>

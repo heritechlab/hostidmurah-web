@@ -124,7 +124,9 @@ export default function AdminTransactionsPage() {
       <div className="flex flex-wrap gap-3">
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as string)}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Semua Tipe" />
+            <SelectValue placeholder="Semua Tipe">
+              {(v: string) => TYPE_LABELS[v] ?? "Semua Tipe"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Tipe</SelectItem>
@@ -137,7 +139,9 @@ export default function AdminTransactionsPage() {
 
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as string)}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Semua Status" />
+            <SelectValue placeholder="Semua Status">
+              {(v: string) => STATUS_LABELS[v] ?? "Semua Status"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Status</SelectItem>
