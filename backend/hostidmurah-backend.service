@@ -6,7 +6,7 @@ Wants=postgresql.service
 [Service]
 Type=simple
 User=ubuntussd
-WorkingDirectory=/www/wwwroot/hostidmurah-backend
+WorkingDirectory=/home/ubuntussd/hostidmurah-web-monorepo/backend
 ExecStart=/home/ubuntussd/.local/bin/uvicorn server:app --host 0.0.0.0 --port 8001 --workers 2
 Restart=always
 RestartSec=5
