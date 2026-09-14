@@ -12,8 +12,10 @@ function CallbackHandler() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const accessToken = searchParams.get("access_token");
-    const error = searchParams.get("error");
+    // Backend mengirim token via hash fragment (#access_token=...), bukan query string
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const accessToken = hashParams.get("access_token") ?? searchParams.get("access_token");
+    const error = hashParams.get("error") ?? searchParams.get("error");
 
     if (error) {
       toast.error("Login dengan Google gagal. Coba lagi.");
