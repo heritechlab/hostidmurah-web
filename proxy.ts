@@ -12,16 +12,6 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth_token")?.value;
   const isAdminHost = hostname.startsWith(ADMIN_HOST_PREFIX);
 
-  if (pathname === "/__debug-host") {
-    return NextResponse.json({
-      hostHeader: request.headers.get("host"),
-      xForwardedHost: request.headers.get("x-forwarded-host"),
-      cfConnectingIp: request.headers.get("cf-connecting-ip"),
-      isAdminHost,
-      url: request.url,
-    }, { headers: { "Cache-Control": "no-store" } });
-  }
-
   if (isAdminHost) {
     // Subdomain admin tidak boleh pernah di-cache CDN — path yang sama persis
     // dengan domain utama (mis. "/") bisa ke-serve dari cache domain utama
@@ -30,6 +20,19 @@ export function proxy(request: NextRequest) {
       res.headers.set("Cache-Control", "no-store, must-revalidate");
       return res;
     };
+
+    // "/" dan "/login" sempat ter-cache CDN dengan konten domain utama saat
+    // subdomain ini pertama kali di-setup (sebelum proxy.ts membaca Host
+    // header dengan benar). Purge cache tidak berhasil membersihkannya, jadi
+    // dipaksa lewat query param unik supaya CDN menganggapnya URL baru.
+    if (
+      (pathname === "/" || pathname === "/login") &&
+      !request.nextUrl.searchParams.has("_v")
+    ) {
+      const bustUrl = request.nextUrl.clone();
+      bustUrl.searchParams.set("_v", "2");
+      return noStore(NextResponse.redirect(bustUrl));
+    }
 
     // Halaman /admin/* hanya boleh diakses lewat subdomain admin, bukan domain utama
     if (pathname.startsWith("/admin")) {
