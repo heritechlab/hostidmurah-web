@@ -65,7 +65,7 @@ const useCases = [
   {
     title: "VPN & Proxy",
     icon: "🔒",
-    desc: "Setup WireGuard, OpenVPN, atau Squid Proxy dengan full root dan IP dedicated.",
+    desc: "Setup WireGuard, OpenVPN, atau Squid Proxy dengan full root (IP Static tersedia sebagai add-on).",
     tags: ["WireGuard", "OpenVPN", "Squid"],
   },
 ];
@@ -75,7 +75,7 @@ const included = [
   "Panel Virtualizor",
   "Proteksi DDoS gratis",
   "Snapshot manual",
-  "IPv4 dedicated",
+  "IPv4 dynamic",
   "Uptime SLA 99.9%",
   "Support 24/7",
   "Reinstall OS kapan saja",
@@ -207,7 +207,7 @@ export default function VpsLinuxPage() {
         <div className="container mx-auto px-4">
           <div className="mb-10 text-center">
             <h2 className="text-3xl font-bold">Pilih Paket VPS Linux</h2>
-            <p className="mt-2 text-muted-foreground">Semua paket sudah termasuk IP dedicated, DDoS protection, dan panel Virtualizor</p>
+            <p className="mt-2 text-muted-foreground">Semua paket sudah termasuk IP dynamic, DDoS protection, dan panel Virtualizor</p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {linuxPlans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}

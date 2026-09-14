@@ -76,7 +76,7 @@ const included = [
   "Windows Server 2022",
   "Proteksi DDoS gratis",
   "Snapshot manual",
-  "IPv4 dedicated",
+  "IPv4 dynamic",
   "Uptime SLA 99.9%",
   "Support 24/7",
   "Lisensi Windows termasuk",
