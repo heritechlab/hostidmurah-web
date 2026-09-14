@@ -51,11 +51,18 @@ function formatRupiah(amount: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 }
 
+const STATUS_FILTERS = [
+  { value: "active", label: "Aktif" },
+  { value: "inactive", label: "Nonaktif" },
+  { value: "all", label: "Semua" },
+] as const;
+
 export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<VPSPackage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<VPSPackage | null>(null);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "delete" | null>(null);
+  const [statusFilter, setStatusFilter] = useState<typeof STATUS_FILTERS[number]["value"]>("active");
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -83,6 +90,12 @@ export default function AdminPackagesPage() {
     setDialogMode(null);
   };
 
+  const filteredPackages = packages.filter((p) => {
+    if (statusFilter === "active") return p.is_active;
+    if (statusFilter === "inactive") return !p.is_active;
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -94,6 +107,22 @@ export default function AdminPackagesPage() {
           <Plus className="size-4" />
           Tambah Paket
         </Button>
+      </div>
+
+      <div className="flex gap-1 border-b border-border pb-1">
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setStatusFilter(f.value)}
+            className={
+              statusFilter === f.value
+                ? "px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                : "px-3 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+            }
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-x-auto">
@@ -119,14 +148,14 @@ export default function AdminPackagesPage() {
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && packages.length === 0 && (
+            {!isLoading && filteredPackages.length === 0 && (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
-                  Belum ada paket VPS.
+                  {packages.length === 0 ? "Belum ada paket VPS." : "Tidak ada paket dengan status ini."}
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && packages.map((p) => (
+            {!isLoading && filteredPackages.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.cpu}</TableCell>
