@@ -89,12 +89,30 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+interface UserLite {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [usersById, setUsersById] = useState<Record<number, UserLite>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [selected, setSelected] = useState<AdminOrder | null>(null);
   const [dialogMode, setDialogMode] = useState<"update" | "assign" | "detail" | null>(null);
+
+  useEffect(() => {
+    api
+      .get<UserLite[]>("/admin/users/all")
+      .then((res) => {
+        const map: Record<number, UserLite> = {};
+        res.data.forEach((u) => { map[u.id] = u; });
+        setUsersById(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async (status?: string | null) => {
     setIsLoading(true);
@@ -157,7 +175,7 @@ export default function AdminOrdersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>ID</TableHead>
-              <TableHead>User ID</TableHead>
+              <TableHead>Nama</TableHead>
               <TableHead>Paket</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Harga</TableHead>
@@ -191,7 +209,12 @@ export default function AdminOrdersPage() {
                   onClick={() => openDialog(o, "detail")}
                 >
                   <TableCell className="font-medium">#{o.id}</TableCell>
-                  <TableCell className="text-muted-foreground">{o.user_id}</TableCell>
+                  <TableCell>
+                    <p className="font-medium">{usersById[o.user_id]?.name ?? `User #${o.user_id}`}</p>
+                    {usersById[o.user_id]?.email && (
+                      <p className="text-xs text-muted-foreground">{usersById[o.user_id].email}</p>
+                    )}
+                  </TableCell>
                   <TableCell>{o.package?.name ?? "-"}</TableCell>
                   <TableCell>
                     <Badge variant={cfg.variant}>{cfg.label}</Badge>
