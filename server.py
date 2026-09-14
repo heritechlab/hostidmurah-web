@@ -2385,8 +2385,11 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
 
     # Redirect ke frontend dengan token via URL fragment (#)
     # Fragment tidak dikirim ke server/tidak masuk access log/browser history
-    redirect_url = f"{FRONTEND_URL}/auth/callback#access_token={access_token}&refresh_token={refresh_token}"
+    # Query param _t unik supaya URL tidak pernah kena cache CDN/edge (Cloudflare)
+    cache_buster = int(datetime.now(timezone.utc).timestamp() * 1000)
+    redirect_url = f"{FRONTEND_URL}/auth/callback?_t={cache_buster}#access_token={access_token}&refresh_token={refresh_token}"
     return RedirectResponse(url=redirect_url)
+
 # ==================== END GOOGLE OAUTH ====================
 
 # Include router
