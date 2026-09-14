@@ -63,9 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await api.post("/auth/login", {
         email,
         password,
-        cf_token: cfToken,
+        turnstile_token: cfToken,
       });
-      const { access_token, user: userData } = data;
+      const { access_token } = data;
+      const { data: userData } = await api.get<User>("/auth/me", {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
       setStoredAuth(access_token, userData);
       setToken(access_token);
       setUser(userData);
@@ -78,9 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (payload: RegisterData, cfToken: string) => {
       const { data } = await api.post("/auth/register", {
         ...payload,
-        cf_token: cfToken,
+        turnstile_token: cfToken,
       });
-      const { access_token, user: userData } = data;
+      const { access_token } = data;
+      const { data: userData } = await api.get<User>("/auth/me", {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
       setStoredAuth(access_token, userData);
       setToken(access_token);
       setUser(userData);
