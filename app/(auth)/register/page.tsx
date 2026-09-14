@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -33,13 +33,23 @@ type RegisterForm = z.infer<typeof registerSchema>;
 const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterPageInner />
+    </Suspense>
+  );
+}
+
+function RegisterPageInner() {
   const { register: registerUser, user, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || undefined;
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && user) router.replace("/dashboard");
-  }, [user, isLoading, router]);
+    if (!isLoading && user) router.replace(redirectTo || "/dashboard");
+  }, [user, isLoading, router, redirectTo]);
   const [cfToken, setCfToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -64,7 +74,8 @@ export default function RegisterPage() {
           phone: values.phone,
           referral_code: values.referral_code,
         },
-        cfToken
+        cfToken,
+        redirectTo
       );
     } catch (err: unknown) {
       const msg =
@@ -85,7 +96,7 @@ export default function RegisterPage() {
         <h1 className="text-2xl font-bold">Buat Akun Gratis</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Sudah punya akun?{" "}
-          <Link href="/login" className="text-primary hover:underline font-medium">
+          <Link href={redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login"} className="text-primary hover:underline font-medium">
             Masuk
           </Link>
         </p>

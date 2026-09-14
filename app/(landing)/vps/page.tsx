@@ -157,7 +157,7 @@ function PlanCard({ plan }: { plan: typeof linuxPlans[0] & { popular?: boolean }
         </div>
 
         <Link
-          href={`/order?plan=${plan.id}&type=linux`}
+          href={`/order?plan=${plan.price.replace(/\./g, "")}&type=linux`}
           className={cn(buttonVariants({ variant: plan.popular ? "default" : "outline" }), "w-full mt-auto")}
         >
           Order Sekarang

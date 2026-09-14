@@ -23,8 +23,8 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string, cfToken: string) => Promise<void>;
-  register: (data: RegisterData, cfToken: string) => Promise<void>;
+  login: (email: string, password: string, cfToken: string, redirectTo?: string) => Promise<void>;
+  register: (data: RegisterData, cfToken: string, redirectTo?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string, cfToken: string) => {
+    async (email: string, password: string, cfToken: string, redirectTo?: string) => {
       const { data } = await api.post("/auth/login", {
         email,
         password,
@@ -72,13 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredAuth(access_token, userData);
       setToken(access_token);
       setUser(userData);
-      router.push("/dashboard");
+      router.push(redirectTo || "/dashboard");
     },
     [router]
   );
 
   const register = useCallback(
-    async (payload: RegisterData, cfToken: string) => {
+    async (payload: RegisterData, cfToken: string, redirectTo?: string) => {
       const { data } = await api.post("/auth/register", {
         ...payload,
         turnstile_token: cfToken,
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredAuth(access_token, userData);
       setToken(access_token);
       setUser(userData);
-      router.push("/dashboard");
+      router.push(redirectTo || "/dashboard");
     },
     [router]
   );

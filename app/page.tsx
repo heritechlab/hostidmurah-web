@@ -113,7 +113,7 @@ export default function Home() {
                       ))}
                     </ul>
                     <Link
-                      href={`/order?plan=${plan.id}&type=linux`}
+                      href={`/order?plan=${plan.price.replace(/\./g, "")}&type=linux`}
                       className={cn(buttonVariants({ variant: plan.popular ? "default" : "outline" }), "w-full")}
                     >
                       Order Sekarang

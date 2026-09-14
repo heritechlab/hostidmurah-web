@@ -152,7 +152,7 @@ function PlanCard({ plan }: { plan: typeof windowsPlans[0] & { popular?: boolean
         </div>
 
         <Link
-          href={`/order?plan=${plan.id}&type=windows`}
+          href={`/order?plan=${plan.price.replace(/\./g, "")}&type=windows`}
           className={cn(buttonVariants({ variant: plan.popular ? "default" : "outline" }), "w-full mt-auto")}
         >
           Order Sekarang

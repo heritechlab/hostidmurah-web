@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,13 +24,23 @@ type LoginForm = z.infer<typeof loginSchema>;
 const GOOGLE_AUTH_URL = `${process.env.NEXT_PUBLIC_API_URL ?? "https://hostidmurah.web.id/api"}/auth/google/login`;
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const { login, user, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || undefined;
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && user) router.replace("/dashboard");
-  }, [user, isLoading, router]);
+    if (!isLoading && user) router.replace(redirectTo || "/dashboard");
+  }, [user, isLoading, router, redirectTo]);
   const [cfToken, setCfToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,7 +57,7 @@ export default function LoginPage() {
     }
     setIsSubmitting(true);
     try {
-      await login(values.email, values.password, cfToken);
+      await login(values.email, values.password, cfToken, redirectTo);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
@@ -67,7 +77,7 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold">Masuk ke Akun</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Belum punya akun?{" "}
-          <Link href="/register" className="text-primary hover:underline font-medium">
+          <Link href={redirectTo ? `/register?redirect=${encodeURIComponent(redirectTo)}` : "/register"} className="text-primary hover:underline font-medium">
             Daftar gratis
           </Link>
         </p>
