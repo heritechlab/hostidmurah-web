@@ -25,7 +25,7 @@ def upgrade() -> None:
 
     op.create_table(
         'vps_ports',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
+        sa.Column('id', sa.Integer(), primary_key=True),
         sa.Column('order_id', sa.Integer(), sa.ForeignKey('vps_orders.id'), nullable=False),
         sa.Column('port_number', sa.Integer(), nullable=False),
         sa.Column('protocol', sa.String(length=10), nullable=True, server_default='tcp'),
@@ -35,12 +35,10 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
-    op.create_index(op.f('ix_vps_ports_id'), 'vps_ports', ['id'], unique=False)
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(op.f('ix_vps_ports_id'), table_name='vps_ports')
     op.drop_table('vps_ports')
     op.drop_column('vps_orders', 'dedicated_ip_price')
     op.drop_column('vps_orders', 'dedicated_ip_status')
