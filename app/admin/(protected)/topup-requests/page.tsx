@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { ExternalLink, Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, resolveAssetUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -158,9 +158,18 @@ export default function AdminTopupRequestsPage() {
                   <Badge variant={statusBadgeVariant(r.status)}>{statusLabel(r.status)}</Badge>
                 </TableCell>
                 <TableCell>
-                  {r.transfer_proof ? (
+                  {r.proof_image ? (
                     <a
-                      href={r.transfer_proof}
+                      href={resolveAssetUrl(r.proof_image) ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
+                    >
+                      Lihat Bukti <ExternalLink className="size-3.5" />
+                    </a>
+                  ) : r.transfer_proof && /^(https?:)?\//.test(r.transfer_proof) ? (
+                    <a
+                      href={resolveAssetUrl(r.transfer_proof) ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
@@ -168,7 +177,9 @@ export default function AdminTopupRequestsPage() {
                       Lihat Bukti <ExternalLink className="size-3.5" />
                     </a>
                   ) : (
-                    <span className="text-muted-foreground text-sm">-</span>
+                    <span className="text-muted-foreground text-sm">
+                      {r.transfer_proof ? r.transfer_proof : "Belum diunggah"}
+                    </span>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">

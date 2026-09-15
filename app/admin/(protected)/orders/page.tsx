@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { MoreHorizontal, Plus, Loader2 } from "lucide-react";
+import { MoreHorizontal, Plus, Loader2, ExternalLink, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, resolveAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,18 @@ interface AdminOrder {
   created_at: string;
   package?: OrderPackage;
   payment_info?: Record<string, unknown>;
+}
+
+interface TopupRequestLite {
+  id: number;
+  order_id?: number | null;
+  amount: number;
+  unique_code: number;
+  total_transfer: number;
+  status: string;
+  proof_image?: string | null;
+  transfer_proof?: string | null;
+  payment_method?: { id: number; name: string } | null;
 }
 
 interface OrderUser {
@@ -243,10 +255,11 @@ export default function AdminOrdersPage() {
       </div>
 
       <Dialog open={dialogMode === "detail"} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <OrderDetailDialogBody
             order={selected}
             onUpdateStatus={() => setDialogMode("update")}
+            onPaymentProcessed={() => { closeDialog(); load(activeStatus); }}
           />
         </DialogContent>
       </Dialog>
@@ -269,12 +282,19 @@ export default function AdminOrdersPage() {
 function OrderDetailDialogBody({
   order,
   onUpdateStatus,
+  onPaymentProcessed,
 }: {
   order: AdminOrder | null;
   onUpdateStatus: () => void;
+  onPaymentProcessed: () => void;
 }) {
   const [user, setUser] = useState<OrderUser | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(false);
+  const [topup, setTopup] = useState<TopupRequestLite | null>(null);
+  const [isLoadingTopup, setIsLoadingTopup] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     if (!order) return;
@@ -287,8 +307,47 @@ function OrderDetailDialogBody({
       .finally(() => setIsLoadingUser(false));
   }, [order?.user_id]);
 
+  useEffect(() => {
+    setTopup(null);
+    setShowRejectForm(false);
+    setRejectReason("");
+    if (!order || order.status !== "pending_payment") return;
+    setIsLoadingTopup(true);
+    api
+      .get<TopupRequestLite[]>("/admin/topup-requests", { params: { status: "pending" } })
+      .then((res) => {
+        const linked = res.data.find((t) => t.order_id === order.id);
+        setTopup(linked ?? null);
+      })
+      .catch(() => setTopup(null))
+      .finally(() => setIsLoadingTopup(false));
+  }, [order?.id, order?.status]);
+
+  const processTopup = async (status: "approved" | "rejected") => {
+    if (!topup) return;
+    if (status === "rejected" && !rejectReason.trim()) {
+      toast.error("Masukkan alasan penolakan.");
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await api.put(`/admin/topup-requests/${topup.id}`, {
+        status,
+        admin_notes: status === "rejected" ? rejectReason : undefined,
+      });
+      toast.success(status === "approved" ? "Pembayaran diterima, pesanan diaktifkan." : "Pembayaran ditolak.");
+      onPaymentProcessed();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal memproses pembayaran.";
+      toast.error(msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!order) return null;
   const cfg = statusBadge[order.status] ?? { label: order.status, variant: "outline" as const };
+  const proofUrl = resolveAssetUrl(topup?.proof_image);
 
   return (
     <>
@@ -360,20 +419,71 @@ function OrderDetailDialogBody({
           </div>
         )}
 
-        {order.payment_info && Object.keys(order.payment_info).length > 0 && (
-          <div className="rounded-lg border border-border p-3 space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Info Pembayaran</p>
-            {Object.entries(order.payment_info).map(([k, v]) => (
-              <div key={k} className="flex justify-between">
-                <span className="text-muted-foreground">{k}</span>
-                <span className="font-medium">{String(v)}</span>
-              </div>
-            ))}
+        {order.status === "pending_payment" && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Verifikasi Pembayaran</p>
+            {isLoadingTopup && <p className="text-muted-foreground">Memuat data pembayaran...</p>}
+            {!isLoadingTopup && !topup && (
+              <p className="text-muted-foreground">Belum ada permintaan transfer untuk pesanan ini (mungkin dibayar via saldo).</p>
+            )}
+            {!isLoadingTopup && topup && (
+              <>
+                <div className="flex justify-between"><span className="text-muted-foreground">Metode</span><span className="font-medium">{topup.payment_method?.name ?? "-"}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Jumlah Transfer</span><span className="font-bold text-primary">{formatRupiah(topup.total_transfer)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Kode Unik</span><span className="font-medium">+{topup.unique_code}</span></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Bukti Transfer</span>
+                  {proofUrl ? (
+                    <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline font-medium">
+                      Lihat Bukti <ExternalLink className="size-3.5" />
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground italic">Belum diunggah</span>
+                  )}
+                </div>
+                {proofUrl && (
+                  <a href={proofUrl} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={proofUrl} alt="Bukti transfer" className="max-h-48 rounded-md border border-border object-contain" />
+                  </a>
+                )}
+
+                {!showRejectForm ? (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button size="sm" className="gap-1.5" disabled={isProcessing} onClick={() => processTopup("approved")}>
+                      <Check className="size-3.5" />
+                      {isProcessing ? "Memproses..." : "Terima Pembayaran"}
+                    </Button>
+                    <Button size="sm" variant="destructive" className="gap-1.5" disabled={isProcessing} onClick={() => setShowRejectForm(true)}>
+                      <X className="size-3.5" />
+                      Tolak
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    <Textarea
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Alasan penolakan, cth. bukti transfer tidak sesuai jumlah"
+                      className="text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="destructive" disabled={isProcessing} onClick={() => processTopup("rejected")}>
+                        {isProcessing ? "Memproses..." : "Konfirmasi Tolak"}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={isProcessing} onClick={() => setShowRejectForm(false)}>
+                        Batal
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
       <DialogFooter>
-        <Button onClick={onUpdateStatus}>Update Status</Button>
+        <Button variant="outline" onClick={onUpdateStatus}>Update Status</Button>
       </DialogFooter>
     </>
   );

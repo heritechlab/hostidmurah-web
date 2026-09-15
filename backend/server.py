@@ -1846,15 +1846,21 @@ async def admin_process_topup_request(
                     package = pkg_result.scalar_one_or_none()
                     if package and user.balance >= order.price_paid:
                         user.balance -= order.price_paid
-                        now = datetime.now(timezone.utc)
-                        base_date = order.expired_at if order.expired_at > now else now
-                        order.expired_at = base_date + timedelta(days=30)
+                        # Order perpanjangan (renewal) sudah punya expired_at aktif sebelumnya
+                        # dan perlu ditambah durasi baru. Order baru (pending_payment sejak awal
+                        # dibuat) sudah punya expired_at yang benar sejak create_order, jadi
+                        # cukup diaktifkan tanpa menambah durasi lagi (hindari expired_at dobel).
+                        is_renewal = bool(topup_req.transfer_proof and topup_req.transfer_proof.startswith("[Perpanjangan]"))
+                        if is_renewal:
+                            now = datetime.now(timezone.utc)
+                            base_date = order.expired_at if order.expired_at > now else now
+                            order.expired_at = base_date + timedelta(days=30)
                         order.status = OrderStatus.active
                         pay_transaction = Transaction(
                             user_id=user.id,
                             type=TransactionType.payment,
                             amount=-order.price_paid,
-                            description=f"Perpanjangan {package.name} (via pembayaran tagihan)",
+                            description=f"{'Perpanjangan' if is_renewal else 'Pembayaran'} {package.name} (via pembayaran tagihan)",
                             status=TransactionStatus.success
                         )
                         db.add(pay_transaction)
@@ -1862,7 +1868,7 @@ async def admin_process_topup_request(
                             user.email, user.name, package.name,
                             float(order.price_paid), order.expired_at,
                             original_price=None,
-                            is_renewal=True
+                            is_renewal=is_renewal
                         )
 
     await db.commit()
