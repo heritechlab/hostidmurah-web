@@ -30,8 +30,12 @@ const GENERAL_FIELDS: SettingFieldDef[] = [
 ];
 
 const SMTP_FIELDS: SettingFieldDef[] = [
-  { key: "smtp_host", label: "SMTP Host", placeholder: "smtp.gmail.com" },
+  { key: "smtp_host", label: "SMTP Host", placeholder: "cth. smtp-relay.brevo.com" },
   { key: "smtp_port", label: "SMTP Port", type: "number", placeholder: "587" },
+  { key: "smtp_user", label: "SMTP User", placeholder: "cth. 8f2a91001@smtp-brevo.com" },
+  { key: "smtp_password", label: "SMTP Password", type: "password", placeholder: "Login/SMTP key dari Brevo" },
+  { key: "smtp_from_name", label: "Nama Pengirim", placeholder: "HostIDMurah" },
+  { key: "smtp_from_email", label: "Email Pengirim", placeholder: "noreply@hostidmurah.web.id" },
 ];
 
 const BILLING_DISCOUNTS_KEY = "billing_discounts";
@@ -65,6 +69,8 @@ export default function AdminSettingsPage() {
   const [original, setOriginal] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState("");
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -98,6 +104,15 @@ export default function AdminSettingsPage() {
     handleChange(BILLING_DISCOUNTS_KEY, JSON.stringify(obj));
   };
 
+  const saveChangedKeys = async (): Promise<boolean> => {
+    const changedKeys = Object.keys(values).filter((k) => values[k] !== original[k]);
+    if (changedKeys.length === 0) return true;
+    await Promise.all(
+      changedKeys.map((key) => api.put("/admin/settings", { key, value: values[key] }))
+    );
+    return true;
+  };
+
   const handleSave = async () => {
     const changedKeys = Object.keys(values).filter((k) => values[k] !== original[k]);
     if (changedKeys.length === 0) {
@@ -106,15 +121,30 @@ export default function AdminSettingsPage() {
     }
     setIsSaving(true);
     try {
-      await Promise.all(
-        changedKeys.map((key) => api.put("/admin/settings", { key, value: values[key] }))
-      );
+      await saveChangedKeys();
       toast.success("Pengaturan berhasil disimpan.");
       await load();
     } catch {
       toast.error("Gagal menyimpan pengaturan.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setIsSendingTest(true);
+    try {
+      await saveChangedKeys();
+      const { data } = await api.post<{ message: string }>("/admin/settings/test-email", {
+        to_email: testEmailAddress || undefined,
+      });
+      toast.success(data.message);
+      await load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal mengirim email test.";
+      toast.error(msg);
+    } finally {
+      setIsSendingTest(false);
     }
   };
 
@@ -202,6 +232,30 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {SMTP_FIELDS.map(renderField)}
+
+          <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
+            <Label>Test Kirim Email</Label>
+            <p className="text-xs text-muted-foreground">
+              Simpan perubahan di atas (otomatis) lalu kirim email percobaan untuk memastikan SMTP berfungsi.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="email"
+                placeholder="Kosongkan untuk kirim ke email admin sendiri"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestEmail}
+                disabled={isSendingTest}
+                className="shrink-0"
+              >
+                {isSendingTest ? "Mengirim..." : "Kirim Test"}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

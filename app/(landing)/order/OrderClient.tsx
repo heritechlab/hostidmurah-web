@@ -316,10 +316,13 @@ export function OrderClient() {
 
   // ─── Step validity ─────────────────────────────────────────────────────────
   const step1Done = selectedPlan !== null;
-  const step3Done = customerName.trim().length >= 2
-    && customerEmail.includes("@")
-    && customerPhone.trim().length >= 8
-    && (isHosting ? domain.trim().length >= 3 : hostname.trim().length >= 3);
+  const missingFields = [
+    customerName.trim().length < 2 && "Nama Lengkap",
+    !customerEmail.includes("@") && "Alamat Email",
+    customerPhone.trim().length < 8 && "No. WhatsApp",
+    (isHosting ? domain.trim().length < 3 : hostname.trim().length < 3) && (isHosting ? "Nama Domain" : "Hostname Server"),
+  ].filter((v): v is string => Boolean(v));
+  const step3Done = missingFields.length === 0;
 
   function confirmStep1() {
     if (!step1Done) return;
@@ -953,7 +956,7 @@ export function OrderClient() {
 
                     {!step3Done && (
                       <p className="text-xs text-center text-muted-foreground">
-                        Lengkapi semua field yang wajib diisi (*) untuk melanjutkan.
+                        Lengkapi dulu: <span className="font-medium text-foreground">{missingFields.join(", ")}</span>
                       </p>
                     )}
                   </div>

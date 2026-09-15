@@ -52,7 +52,8 @@ from auth import (
 from tripay import get_payment_methods, create_invoice, verify_callback_signature
 from email_service import (
     send_welcome_email, send_topup_success_email, send_order_created_email,
-    send_referral_bonus_email, send_password_reset_email
+    send_referral_bonus_email, send_password_reset_email,
+    send_email, load_smtp_settings_from_db, SMTP_SETTING_KEYS
 )
 from scheduler import start_scheduler, stop_scheduler
 
@@ -88,6 +89,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up VPS Store API...")
     await init_db()
     await seed_initial_data()
+    from database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        await load_smtp_settings_from_db(db)
     start_scheduler()
     yield
     # Shutdown
@@ -134,6 +138,10 @@ async def seed_initial_data():
             ("contact_whatsapp", "6281234567890"),
             ("smtp_host", "smtp.gmail.com"),
             ("smtp_port", "587"),
+            ("smtp_user", ""),
+            ("smtp_password", ""),
+            ("smtp_from_name", "HostIDMurah"),
+            ("smtp_from_email", "noreply@hostidmurah.web.id"),
             ("billing_discounts", '{"1": 0, "3": 5, "6": 10, "12": 15}'),
         ]
         
@@ -1558,8 +1566,31 @@ async def admin_update_setting(
         db.add(setting)
     
     await db.commit()
-    
+
+    if data.key in SMTP_SETTING_KEYS:
+        await load_smtp_settings_from_db(db)
+
     return {"message": "Setting berhasil diupdate"}
+
+
+@api_router.post("/admin/settings/test-email")
+async def admin_test_email(
+    data: dict,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Kirim email test dengan konfigurasi SMTP yang sedang aktif (admin)"""
+    to_email = data.get("to_email") or admin.email
+    await load_smtp_settings_from_db(db)
+    ok = await send_email(
+        to_email=to_email,
+        subject="Test SMTP - HostIDMurah",
+        html_content="<p>Ini email test dari panel admin HostIDMurah. Kalau kamu menerima ini, konfigurasi SMTP sudah berfungsi dengan benar.</p>",
+        plain_text="Ini email test dari panel admin HostIDMurah. Kalau kamu menerima ini, konfigurasi SMTP sudah berfungsi dengan benar.",
+    )
+    if not ok:
+        raise HTTPException(status_code=500, detail="Gagal mengirim email. Cek kembali host/port/user/password SMTP.")
+    return {"message": f"Email test berhasil dikirim ke {to_email}"}
 
 # ==================== PAYMENT METHODS (PUBLIC) ====================
 

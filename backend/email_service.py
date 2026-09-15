@@ -9,7 +9,8 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# SMTP Configuration
+# SMTP Configuration — nilai awal dari .env, bisa ditimpa dari SiteSettings
+# (admin panel) lewat load_smtp_settings_from_db() saat startup & saat disimpan.
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
@@ -17,6 +18,44 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", "Host ID Murah")
 SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "noreply@hostidmurah.web.id")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://localhost:3000")
+
+SMTP_SETTING_KEYS = {
+    "smtp_host": "SMTP_HOST",
+    "smtp_port": "SMTP_PORT",
+    "smtp_user": "SMTP_USER",
+    "smtp_password": "SMTP_PASSWORD",
+    "smtp_from_name": "SMTP_FROM_NAME",
+    "smtp_from_email": "SMTP_FROM_EMAIL",
+}
+
+
+async def load_smtp_settings_from_db(db) -> None:
+    """Timpa konfigurasi SMTP module-level dari SiteSettings (admin panel),
+    kalau nilainya diisi. Dipanggil saat startup dan tiap admin simpan setting SMTP."""
+    global SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME, SMTP_FROM_EMAIL
+    from sqlalchemy import select
+    from database import SiteSettings
+
+    result = await db.execute(
+        select(SiteSettings).where(SiteSettings.key.in_(SMTP_SETTING_KEYS.keys()))
+    )
+    rows = {row.key: row.value for row in result.scalars().all() if row.value}
+
+    if "smtp_host" in rows:
+        SMTP_HOST = rows["smtp_host"]
+    if "smtp_port" in rows:
+        try:
+            SMTP_PORT = int(rows["smtp_port"])
+        except ValueError:
+            pass
+    if "smtp_user" in rows:
+        SMTP_USER = rows["smtp_user"]
+    if "smtp_password" in rows:
+        SMTP_PASSWORD = rows["smtp_password"]
+    if "smtp_from_name" in rows:
+        SMTP_FROM_NAME = rows["smtp_from_name"]
+    if "smtp_from_email" in rows:
+        SMTP_FROM_EMAIL = rows["smtp_from_email"]
 
 
 def format_currency(amount) -> str:
