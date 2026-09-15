@@ -124,7 +124,7 @@ class VPSOrder(Base):
     notes = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
     vps_details = Column(Text, nullable=True)  # JSON string: remote access, ports, credentials
-    dedicated_ip_status = Column(String(20), default="none")  # none | requested | active | rejected
+    dedicated_ip_status = Column(String(20), default="none")  # none | pending_payment | active | rejected
     dedicated_ip_price = Column(Numeric(15, 2), nullable=True)  # snapshot harga add-on saat direquest
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

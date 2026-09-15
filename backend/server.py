@@ -43,7 +43,7 @@ from schemas import (
     PaymentMethodCreate, PaymentMethodUpdate, PaymentMethodResponse,
     TopupRequestCreate, TopupRequestUpdate, TopupRequestResponse,
     TicketCreate, TicketReplyCreate, TicketAdminAction, TicketReplyResponse, TicketResponse,
-    DedicatedIpAdminUpdate, PortRequestCreate, PortRequestUpdate, PortRequestResponse,
+    DedicatedIpRequestCreate, PortRequestCreate, PortRequestUpdate, PortRequestResponse,
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, create_refresh_token,
@@ -842,24 +842,76 @@ async def _get_owned_order(order_id: str, user: User, db: AsyncSession) -> VPSOr
 @api_router.post("/orders/{order_id}/dedicated-ip", response_model=VPSOrderResponse)
 async def request_dedicated_ip(
     order_id: str,
+    data: DedicatedIpRequestCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """User request add-on IP Dedicated Static untuk VPS yang sudah aktif.
-    Biaya add-on dikonfirmasi & ditagih terpisah oleh admin (belum ada jalur
-    pembayaran online khusus untuk add-on ini)."""
+    """User request & bayar add-on IP Dedicated Static untuk VPS yang sudah aktif.
+    Mode 'balance': langsung dipotong dari saldo & aktif seketika (kalau cukup).
+    Mode 'transfer': membuat TopupRequest (sama seperti bayar tagihan order), add-on
+    baru aktif setelah admin memverifikasi pembayaran."""
+    import random
+
     order = await _get_owned_order(order_id, user, db)
     if order.status != OrderStatus.active:
         raise HTTPException(status_code=400, detail="Add-on hanya bisa diminta untuk VPS yang sudah aktif")
-    if order.dedicated_ip_status == "active":
-        raise HTTPException(status_code=400, detail="Add-on IP Dedicated Static sudah aktif")
-    if order.dedicated_ip_status == "requested":
-        raise HTTPException(status_code=400, detail="Permintaan add-on sedang diproses admin")
+    if order.dedicated_ip_status in ("active", "pending_payment"):
+        raise HTTPException(status_code=400, detail="Add-on ini sudah aktif atau sedang menunggu pembayaran")
 
-    order.dedicated_ip_status = "requested"
-    order.dedicated_ip_price = await get_dedicated_ip_price(db)
-    await db.commit()
-    await db.refresh(order)
+    price = await get_dedicated_ip_price(db)
+    order.dedicated_ip_price = price
+
+    if data.payment_mode == "balance":
+        result = await db.execute(select(User).where(User.id == user.id))
+        db_user = result.scalar_one_or_none()
+        if not db_user or db_user.balance < price:
+            raise HTTPException(status_code=400, detail="Saldo tidak cukup. Gunakan transfer manual atau top up saldo dulu.")
+        db_user.balance -= price
+        order.dedicated_ip_status = "active"
+        db.add(Transaction(
+            user_id=db_user.id,
+            type=TransactionType.payment,
+            amount=-price,
+            description=f"Add-on IP Dedicated Static - {order.order_number or order.id} (dari saldo)",
+            status=TransactionStatus.success
+        ))
+        await db.commit()
+        await db.refresh(order)
+    elif data.payment_mode == "transfer":
+        if not data.payment_method_id:
+            raise HTTPException(status_code=400, detail="Pilih metode pembayaran untuk transfer manual")
+        unique_code = random.randint(1, 999)
+        total_transfer = price + Decimal(unique_code)
+
+        topup_request = TopupRequest(
+            user_id=user.id,
+            payment_method_id=data.payment_method_id,
+            amount=price,
+            unique_code=unique_code,
+            total_transfer=total_transfer,
+            status=TopupRequestStatus.pending,
+            order_id=order.id,
+            transfer_proof="[AddonIP] Add-on IP Dedicated Static",
+        )
+        db.add(topup_request)
+        order.dedicated_ip_status = "pending_payment"
+        await db.commit()
+        await db.refresh(order)
+
+        pm_result = await db.execute(select(PaymentMethod).where(PaymentMethod.id == data.payment_method_id))
+        pm = pm_result.scalar_one_or_none()
+        order.payment_info = {
+            "topup_request_id": topup_request.id,
+            "amount": float(price),
+            "unique_code": unique_code,
+            "total_transfer": float(total_transfer),
+            "payment_method_id": data.payment_method_id,
+            "payment_method_name": pm.name if pm else None,
+            "account_number": pm.account_number if pm else None,
+            "account_name": pm.account_name if pm else None,
+        }
+    else:
+        raise HTTPException(status_code=400, detail="payment_mode harus 'balance' atau 'transfer'")
 
     pkg_result = await db.execute(select(VPSPackage).where(VPSPackage.id == order.package_id))
     order.package = pkg_result.scalar_one_or_none()
@@ -1663,35 +1715,6 @@ async def admin_update_order(
     return order
 
 
-@api_router.put("/admin/orders/{order_id}/dedicated-ip", response_model=VPSOrderResponse)
-async def admin_process_dedicated_ip(
-    order_id: int,
-    data: DedicatedIpAdminUpdate,
-    admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """Approve/reject permintaan add-on IP Dedicated Static (admin)"""
-    result = await db.execute(select(VPSOrder).where(VPSOrder.id == order_id))
-    order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order tidak ditemukan")
-    if order.dedicated_ip_status != "requested":
-        raise HTTPException(status_code=400, detail="Tidak ada permintaan add-on yang menunggu diproses")
-    if data.status not in ("active", "rejected"):
-        raise HTTPException(status_code=400, detail="Status harus active atau rejected")
-
-    order.dedicated_ip_status = data.status
-    if data.status == "active" and data.ip_address:
-        order.ip_address = data.ip_address
-
-    await db.commit()
-    await db.refresh(order)
-
-    pkg_result = await db.execute(select(VPSPackage).where(VPSPackage.id == order.package_id))
-    order.package = pkg_result.scalar_one_or_none()
-    return order
-
-
 @api_router.get("/admin/orders/{order_id}/ports", response_model=List[PortRequestResponse])
 async def admin_list_order_ports(
     order_id: int,
@@ -2039,11 +2062,34 @@ async def admin_process_topup_request(
     if topup_req.status != TopupRequestStatus.pending:
         raise HTTPException(status_code=400, detail="Request sudah diproses sebelumnya")
 
+    is_addon_ip = bool(topup_req.transfer_proof and topup_req.transfer_proof.startswith("[AddonIP]"))
+
     if data.status:
         topup_req.status = data.status
     if data.admin_notes is not None:
         topup_req.admin_notes = data.admin_notes
     topup_req.approved_by = admin.id
+
+    if is_addon_ip and topup_req.order_id:
+        # Pembayaran transfer untuk add-on IP Dedicated Static — dana ditransfer
+        # langsung untuk add-on ini, bukan top up saldo, jadi jangan disamakan
+        # dengan alur kredit saldo/renewal order di bawah.
+        order_result = await db.execute(select(VPSOrder).where(VPSOrder.id == topup_req.order_id))
+        order = order_result.scalar_one_or_none()
+        if order:
+            if data.status == "approved":
+                order.dedicated_ip_status = "active"
+                db.add(Transaction(
+                    user_id=topup_req.user_id,
+                    type=TransactionType.payment,
+                    amount=-topup_req.amount,
+                    description="Pembayaran add-on IP Dedicated Static (transfer manual)",
+                    status=TransactionStatus.success
+                ))
+            elif data.status == "rejected":
+                order.dedicated_ip_status = "rejected"
+        await db.commit()
+        return {"message": f"Request berhasil {data.status}", "request_id": request_id}
 
     if data.status == "approved":
         result = await db.execute(select(User).where(User.id == topup_req.user_id))

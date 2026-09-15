@@ -296,20 +296,36 @@ export default function AdminOrdersPage() {
 }
 
 function DedicatedIpAdminSection({ order, onChanged }: { order: AdminOrder; onChanged: () => void }) {
-  const [ipAddress, setIpAddress] = useState(order.ip_address ?? "");
+  const [topup, setTopup] = useState<TopupRequestLite | null>(null);
+  const [isLoadingTopup, setIsLoadingTopup] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const status = order.dedicated_ip_status ?? "none";
+
+  useEffect(() => {
+    setTopup(null);
+    if (status !== "pending_payment") return;
+    setIsLoadingTopup(true);
+    api
+      .get<TopupRequestLite[]>("/admin/topup-requests", { params: { status: "pending" } })
+      .then((res) => {
+        const linked = res.data.find((t) => t.order_id === order.id && t.transfer_proof?.startsWith("[AddonIP]"));
+        setTopup(linked ?? null);
+      })
+      .catch(() => setTopup(null))
+      .finally(() => setIsLoadingTopup(false));
+  }, [order.id, status]);
+
   if (order.status !== "active" || status === "none") return null;
 
-  const process = async (newStatus: "active" | "rejected") => {
+  const proofUrl = resolveAssetUrl(topup?.proof_image);
+
+  const process = async (newStatus: "approved" | "rejected") => {
+    if (!topup) return;
     setIsProcessing(true);
     try {
-      await api.put(`/admin/orders/${order.id}/dedicated-ip`, {
-        status: newStatus,
-        ip_address: newStatus === "active" ? (ipAddress || undefined) : undefined,
-      });
-      toast.success(newStatus === "active" ? "Add-on IP Dedicated diaktifkan." : "Permintaan add-on ditolak.");
+      await api.put(`/admin/topup-requests/${topup.id}`, { status: newStatus });
+      toast.success(newStatus === "approved" ? "Add-on IP Dedicated diaktifkan." : "Permintaan add-on ditolak.");
       onChanged();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal memproses add-on.";
@@ -323,18 +339,34 @@ function DedicatedIpAdminSection({ order, onChanged }: { order: AdminOrder; onCh
     <div className="rounded-lg border border-border p-3 space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add-on IP Dedicated Static</p>
-        <Badge variant={status === "requested" ? "outline" : status === "active" ? "default" : "destructive"}>
-          {status === "requested" ? "Menunggu" : status === "active" ? "Aktif" : "Ditolak"}
+        <Badge variant={status === "pending_payment" ? "outline" : status === "active" ? "default" : "destructive"}>
+          {status === "pending_payment" ? "Menunggu Pembayaran" : status === "active" ? "Aktif" : "Ditolak"}
         </Badge>
       </div>
       {order.dedicated_ip_price !== undefined && order.dedicated_ip_price !== null && (
         <div className="flex justify-between"><span className="text-muted-foreground">Harga</span><span className="font-medium">{formatRupiah(order.dedicated_ip_price)}</span></div>
       )}
-      {status === "requested" && (
+      {status === "pending_payment" && isLoadingTopup && (
+        <p className="text-muted-foreground">Memuat data pembayaran...</p>
+      )}
+      {status === "pending_payment" && !isLoadingTopup && !topup && (
+        <p className="text-muted-foreground">Belum ada transfer masuk untuk add-on ini (mungkin dibayar dari saldo, cek ulang beberapa saat lagi).</p>
+      )}
+      {status === "pending_payment" && !isLoadingTopup && topup && (
         <>
-          <Input placeholder="IP dedicated yang di-assign (opsional)" value={ipAddress} onChange={(e) => setIpAddress(e.target.value)} />
+          <div className="flex justify-between"><span className="text-muted-foreground">Jumlah Transfer</span><span className="font-bold text-primary">{formatRupiah(topup.total_transfer)}</span></div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Bukti Transfer</span>
+            {proofUrl ? (
+              <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline font-medium">
+                Lihat Bukti <ExternalLink className="size-3.5" />
+              </a>
+            ) : (
+              <span className="text-muted-foreground italic">Belum diunggah</span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="gap-1.5" disabled={isProcessing} onClick={() => process("active")}>
+            <Button size="sm" className="gap-1.5" disabled={isProcessing} onClick={() => process("approved")}>
               <Check className="size-3.5" /> Aktifkan
             </Button>
             <Button size="sm" variant="destructive" className="gap-1.5" disabled={isProcessing} onClick={() => process("rejected")}>

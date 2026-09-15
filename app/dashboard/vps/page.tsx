@@ -56,6 +56,12 @@ const portStatusConfig: Record<string, { label: string; color: string }> = {
   rejected: { label: "Ditolak", color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
 };
 
+function extractOs(notes?: string): string | null {
+  if (!notes) return null;
+  const match = notes.match(/^OS:\s*(.+)$/m);
+  return match ? match[1].trim() : null;
+}
+
 function parseVpsDetails(raw?: string): Record<string, string> | null {
   if (!raw) return null;
   try {
@@ -98,68 +104,284 @@ function CopyableField({ label, value, secret }: { label: string; value: string;
   );
 }
 
+interface PaymentMethodOption {
+  id: number;
+  name: string;
+  type: string;
+  account_number: string;
+  account_name: string;
+}
+
+interface DedicatedIpPaymentInfo {
+  topup_request_id?: number;
+  amount: number;
+  unique_code: number;
+  total_transfer: number;
+  payment_method_id: number;
+  payment_method_name?: string;
+  account_number?: string;
+  account_name?: string;
+}
+
+interface TopupRequestLite {
+  id: number;
+  order_id?: number | null;
+  status: string;
+  amount: number;
+  unique_code: number;
+  total_transfer: number;
+  proof_image?: string | null;
+  transfer_proof?: string | null;
+  payment_method?: { id: number; name: string; account_number: string; account_name: string } | null;
+}
+
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <button onClick={copy} className="flex items-center gap-1 font-mono text-sm hover:text-primary">
+        {value}
+        {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5 text-muted-foreground" />}
+      </button>
+    </div>
+  );
+}
+
 function DedicatedIpSection({ order, onChanged }: { order: VPSOrder; onChanged: () => void }) {
-  const [price, setPrice] = useState<number | null>(null);
-  const [isRequesting, setIsRequesting] = useState(false);
+  const orderRef = order.order_number ?? String(order.id);
   const status = order.dedicated_ip_status ?? "none";
 
+  const [price, setPrice] = useState<number | null>(null);
+  const [step, setStep] = useState<"idle" | "mode" | "method">("idle");
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>([]);
+  const [selectedPmId, setSelectedPmId] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [paymentInfo, setPaymentInfo] = useState<DedicatedIpPaymentInfo | null>(null);
+  const [topupId, setTopupId] = useState<number | null>(null);
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [isLoadingPaymentInfo, setIsLoadingPaymentInfo] = useState(false);
+
   useEffect(() => {
-    if (status !== "none") return;
-    api
-      .get<{ price: number }>("/dedicated-ip-addon-price")
-      .then((res) => setPrice(res.data.price))
-      .catch(() => {});
+    if (status !== "none" && status !== "rejected") return;
+    api.get<{ price: number }>("/dedicated-ip-addon-price").then((res) => setPrice(res.data.price)).catch(() => {});
   }, [status]);
 
-  const requestAddon = async () => {
-    const orderRef = order.order_number ?? String(order.id);
-    setIsRequesting(true);
+  useEffect(() => {
+    if (status !== "pending_payment" || paymentInfo) return;
+    setIsLoadingPaymentInfo(true);
+    api
+      .get<TopupRequestLite[]>("/topup-request")
+      .then((res) => {
+        const linked = res.data.find(
+          (t) => t.order_id === order.id && t.status === "pending" && t.transfer_proof?.startsWith("[AddonIP]")
+        );
+        if (linked) {
+          setTopupId(linked.id);
+          setProofImage(linked.proof_image ?? null);
+          setPaymentInfo({
+            amount: linked.amount,
+            unique_code: linked.unique_code,
+            total_transfer: linked.total_transfer,
+            payment_method_id: linked.payment_method?.id ?? 0,
+            payment_method_name: linked.payment_method?.name,
+            account_number: linked.payment_method?.account_number,
+            account_name: linked.payment_method?.account_name,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingPaymentInfo(false));
+  }, [status, order.id, paymentInfo]);
+
+  const openMethodPicker = () => {
+    setStep("method");
+    if (paymentMethods.length === 0) {
+      api.get<PaymentMethodOption[]>("/payment-methods").then((res) => setPaymentMethods(res.data)).catch(() => {});
+    }
+  };
+
+  const submitBalance = async () => {
+    setIsSubmitting(true);
     try {
-      await api.post(`/orders/${orderRef}/dedicated-ip`);
-      toast.success("Permintaan add-on dikirim, menunggu diaktifkan admin.");
+      await api.post(`/orders/${orderRef}/dedicated-ip`, { payment_mode: "balance" });
+      toast.success("Add-on IP Dedicated Static aktif, dibayar dari saldo.");
+      setStep("idle");
+      onChanged();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal memproses pembayaran.";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const submitTransfer = async () => {
+    if (!selectedPmId) {
+      toast.error("Pilih metode pembayaran terlebih dahulu.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { data: updated } = await api.post<{ payment_info?: DedicatedIpPaymentInfo }>(
+        `/orders/${orderRef}/dedicated-ip`,
+        { payment_mode: "transfer", payment_method_id: selectedPmId }
+      );
+      if (updated.payment_info) {
+        setPaymentInfo(updated.payment_info);
+        if (updated.payment_info.topup_request_id) setTopupId(updated.payment_info.topup_request_id);
+      }
+      toast.success("Instruksi pembayaran dibuat, silakan transfer & upload bukti.");
+      setStep("idle");
       onChanged();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal mengirim permintaan add-on.";
       toast.error(msg);
     } finally {
-      setIsRequesting(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUploadProof = async (file: File) => {
+    if (!topupId) {
+      toast.error("Data pembayaran belum siap, coba refresh halaman.");
+      return;
+    }
+    setIsUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data: uploaded } = await api.post<{ url: string }>("/upload/proof", formData, {
+        headers: { "Content-Type": undefined },
+      });
+      await api.put(`/topup-request/${topupId}`, { proof_image: uploaded.url });
+      setProofImage(uploaded.url);
+      toast.success("Bukti transfer berhasil diunggah.");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal mengunggah bukti transfer.";
+      toast.error(msg);
+    } finally {
+      setIsUploadingProof(false);
     }
   };
 
   if (status === "active") return null;
 
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Globe className="size-4 text-primary shrink-0" />
-          <div>
-            <p className="text-sm font-medium">Add-on IP Dedicated Static</p>
-            <p className="text-xs text-muted-foreground">
-              Port custom hanya bisa diatur setelah add-on ini aktif.
-              {price !== null && status === "none" && ` Biaya: ${formatRupiah(price)}/bulan.`}
-            </p>
-          </div>
+    <div className="rounded-lg border border-border p-3 space-y-3">
+      <div className="flex items-start gap-2">
+        <Globe className="size-4 text-primary shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Add-on IP Dedicated Static</p>
+          <p className="text-xs text-muted-foreground">Port custom hanya bisa diatur setelah add-on ini aktif & lunas.</p>
         </div>
-        {status === "none" && (
-          <Button size="sm" variant="outline" disabled={isRequesting} onClick={requestAddon}>
-            {isRequesting ? "Mengirim..." : "Request Add-on"}
-          </Button>
-        )}
-        {status === "requested" && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-950/30">
-            Menunggu aktivasi admin
-          </span>
-        )}
-        {status === "rejected" && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-red-600">Permintaan ditolak</span>
-            <Button size="sm" variant="outline" disabled={isRequesting} onClick={requestAddon}>
-              {isRequesting ? "Mengirim..." : "Request Lagi"}
-            </Button>
-          </div>
+        {status === "none" && step === "idle" && (
+          <Button size="sm" variant="outline" onClick={() => setStep("mode")}>Request Add-on</Button>
         )}
       </div>
+
+      {status === "none" && price !== null && step === "idle" && (
+        <p className="text-xs text-muted-foreground">Biaya: {formatRupiah(price)}/bulan.</p>
+      )}
+
+      {step === "mode" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          {price !== null && <p className="text-sm">Total: <span className="font-semibold text-primary">{formatRupiah(price)}</span></p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" disabled={isSubmitting} onClick={submitBalance}>
+              {isSubmitting ? "Memproses..." : "Bayar dari Saldo"}
+            </Button>
+            <Button size="sm" variant="outline" disabled={isSubmitting} onClick={openMethodPicker}>
+              Transfer Manual
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setStep("idle")}>Batal</Button>
+          </div>
+        </div>
+      )}
+
+      {step === "method" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <p className="text-sm font-medium">Pilih Metode Transfer</p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {paymentMethods.map((pm) => (
+              <button
+                key={pm.id}
+                onClick={() => setSelectedPmId(pm.id)}
+                className={cn(
+                  "text-left rounded-lg border p-2.5 text-sm transition-colors",
+                  selectedPmId === pm.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:border-primary/50"
+                )}
+              >
+                <p className="font-medium">{pm.name}</p>
+                <p className="text-xs text-muted-foreground">{pm.account_number}</p>
+              </button>
+            ))}
+            {paymentMethods.length === 0 && <p className="text-sm text-muted-foreground">Memuat metode pembayaran...</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" disabled={isSubmitting || !selectedPmId} onClick={submitTransfer}>
+              {isSubmitting ? "Memproses..." : "Lanjutkan"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setStep("mode")}>Kembali</Button>
+          </div>
+        </div>
+      )}
+
+      {status === "pending_payment" && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          {isLoadingPaymentInfo && <p className="text-sm text-muted-foreground">Memuat instruksi pembayaran...</p>}
+          {!isLoadingPaymentInfo && paymentInfo && (
+            <>
+              {paymentInfo.payment_method_name && (
+                <p className="text-sm">Transfer ke <span className="font-medium">{paymentInfo.payment_method_name}</span></p>
+              )}
+              {paymentInfo.account_number && <CopyField label="Nomor Rekening/Akun" value={paymentInfo.account_number} />}
+              {paymentInfo.account_name && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground text-xs">Atas Nama</span>
+                  <span className="text-sm">{paymentInfo.account_name}</span>
+                </div>
+              )}
+              <CopyField label="Jumlah Transfer (termasuk kode unik)" value={String(paymentInfo.total_transfer)} />
+
+              {proofImage ? (
+                <a href={proofImage} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-block">
+                  Lihat bukti yang sudah diunggah
+                </a>
+              ) : (
+                <label className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={isUploadingProof}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadProof(f); }}
+                  />
+                  {isUploadingProof ? "Mengunggah..." : "Upload Bukti Transfer"}
+                </label>
+              )}
+            </>
+          )}
+          {!isLoadingPaymentInfo && !paymentInfo && (
+            <p className="text-sm text-muted-foreground">Menunggu verifikasi admin.</p>
+          )}
+        </div>
+      )}
+
+      {status === "rejected" && step === "idle" && (
+        <div className="flex items-center gap-2 pt-1 border-t border-border">
+          <span className="text-xs text-red-600">Permintaan sebelumnya ditolak.</span>
+          <Button size="sm" variant="outline" onClick={() => setStep("mode")}>Request Lagi</Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -328,6 +550,7 @@ function PortsSection({ order }: { order: VPSOrder }) {
 function VpsCard({ order: initialOrder }: { order: VPSOrder }) {
   const [order, setOrder] = useState(initialOrder);
   const details = parseVpsDetails(order.vps_details);
+  const os = extractOs(order.notes);
   const daysLeft = Math.ceil((new Date(order.expired_at).getTime() - Date.now()) / 86400000);
 
   const refetch = () => {
@@ -362,6 +585,7 @@ function VpsCard({ order: initialOrder }: { order: VPSOrder }) {
           <span className="px-2 py-1 rounded-md bg-muted">{order.package.ram}</span>
           <span className="px-2 py-1 rounded-md bg-muted">{order.package.storage}</span>
           {order.package.bandwidth && <span className="px-2 py-1 rounded-md bg-muted">{order.package.bandwidth}</span>}
+          {os && <span className="px-2 py-1 rounded-md bg-primary/10 text-primary font-medium">{os}</span>}
         </div>
       )}
 

@@ -181,9 +181,9 @@ class VPSOrderUpdate(BaseModel):
     vps_details: Optional[str] = None
 
 
-class DedicatedIpAdminUpdate(BaseModel):
-    status: str  # 'active' | 'rejected'
-    ip_address: Optional[str] = None
+class DedicatedIpRequestCreate(BaseModel):
+    payment_mode: str  # 'balance' | 'transfer'
+    payment_method_id: Optional[int] = None
 
 
 class PortRequestCreate(BaseModel):
