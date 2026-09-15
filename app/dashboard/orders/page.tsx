@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShoppingCart, Plus, Clock, CheckCircle2, XCircle, Server, AlertCircle } from "lucide-react";
+import { ShoppingCart, Plus, Clock, CheckCircle2, XCircle, Server, AlertCircle, PauseCircle } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,26 +26,26 @@ interface VPSOrder {
   ip_address?: string;
   created_at: string;
   package?: VPSPackage;
-  payment_info?: Record<string, string>;
 }
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string }> = {
-  pending:   { label: "Menunggu Pembayaran", icon: Clock,         color: "text-orange-600 bg-orange-50 dark:bg-orange-950/30" },
-  paid:      { label: "Dibayar",             icon: CheckCircle2,  color: "text-blue-600 bg-blue-50 dark:bg-blue-950/30" },
-  active:    { label: "Aktif",               icon: Server,        color: "text-green-600 bg-green-50 dark:bg-green-950/30" },
-  expired:   { label: "Kadaluarsa",          icon: AlertCircle,   color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30" },
-  cancelled: { label: "Dibatalkan",          icon: XCircle,       color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
+  pending_payment: { label: "Menunggu Pembayaran", icon: Clock,        color: "text-orange-600 bg-orange-50 dark:bg-orange-950/30" },
+  active:          { label: "Aktif",               icon: Server,       color: "text-green-600 bg-green-50 dark:bg-green-950/30" },
+  suspended:       { label: "Ditangguhkan",         icon: PauseCircle,  color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30" },
+  expired:         { label: "Kadaluarsa",           icon: AlertCircle,  color: "text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30" },
+  cancelled:       { label: "Dibatalkan",           icon: XCircle,      color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
 };
 
-const TABS = ["Semua", "Menunggu", "Aktif", "Dibayar", "Dibatalkan"] as const;
+const TABS = ["Semua", "Menunggu", "Aktif", "Ditangguhkan", "Kadaluarsa", "Dibatalkan"] as const;
 type Tab = typeof TABS[number];
 
 const tabToStatus: Record<Tab, string | null> = {
-  "Semua":     null,
-  "Menunggu":  "pending",
-  "Aktif":     "active",
-  "Dibayar":   "paid",
-  "Dibatalkan":"cancelled",
+  "Semua":        null,
+  "Menunggu":     "pending_payment",
+  "Aktif":        "active",
+  "Ditangguhkan": "suspended",
+  "Kadaluarsa":   "expired",
+  "Dibatalkan":   "cancelled",
 };
 
 function formatRupiah(amount: number) {
@@ -150,16 +150,19 @@ export default function OrdersPage() {
       {!isLoading && !error && filtered.length > 0 && (
         <div className="space-y-3">
           {filtered.map((order) => {
-            const cfg = statusConfig[order.status] ?? statusConfig.pending;
+            const cfg = statusConfig[order.status] ?? statusConfig.pending_payment;
             const Icon = cfg.icon;
-            const orderRef = order.payment_info?.merchant_ref ?? order.payment_info?.reference ?? `#${order.id}`;
-            const paymentUrl = order.payment_info?.payment_url ?? order.payment_info?.checkout_url;
+            const isPending = order.status === "pending_payment";
 
             return (
-              <div key={order.id} className="rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <Link
+                key={order.id}
+                href={`/payment?orderId=${order.id}`}
+                className="block rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-primary/50 transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm font-mono">{orderRef}</span>
+                    <span className="font-semibold text-sm font-mono">#{order.id}</span>
                     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", cfg.color)}>
                       <Icon className="size-3" />
                       {cfg.label}
@@ -167,7 +170,6 @@ export default function OrdersPage() {
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     {order.package?.name ?? "Paket tidak diketahui"}
-                    {order.notes ? ` · ${order.notes}` : ""}
                     {order.ip_address ? ` · ${order.ip_address}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -177,13 +179,13 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-semibold text-sm">{formatRupiah(order.price_paid)}</span>
-                  {order.status === "pending" && paymentUrl && (
-                    <a href={paymentUrl} className={cn(buttonVariants({ size: "sm" }))}>
+                  {isPending && (
+                    <span className={cn(buttonVariants({ size: "sm" }))}>
                       Bayar
-                    </a>
+                    </span>
                   )}
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

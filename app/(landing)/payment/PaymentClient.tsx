@@ -49,6 +49,15 @@ interface PaymentMethod {
   account_name: string;
 }
 
+interface TopupRequest {
+  order_id?: number;
+  amount: number;
+  unique_code: number;
+  total_transfer: number;
+  payment_method_id: number;
+  payment_method?: PaymentMethod;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRupiah(n: number) {
@@ -120,19 +129,40 @@ function RealOrderPayment({
   const loadOrder = useCallback(async (showToast = false) => {
     try {
       const { data } = await api.get<RealOrder>(`/orders/${orderId}`);
-      // payment_info dari GET tidak persisten di backend — pakai yang dari URL kalau ada
-      if (hasUrlPaymentInfo) data.payment_info = urlPaymentInfo;
-      setOrder(data);
-      const pmId = data.payment_info?.payment_method_id;
-      if (pmId) {
+
+      if (hasUrlPaymentInfo) {
+        // Baru saja dibuat — payment_info dari URL (respons awal POST /orders)
+        data.payment_info = urlPaymentInfo;
+        if (urlPaymentInfo.payment_method_id) {
+          try {
+            const { data: methods } = await api.get<PaymentMethod[]>("/payment-methods");
+            const pm = methods.find((m) => m.id === urlPaymentInfo.payment_method_id);
+            if (pm) setPaymentMethod(pm);
+          } catch {
+            // biarkan tanpa detail metode kalau gagal
+          }
+        }
+      } else if (data.status === "pending_payment") {
+        // Buka ulang invoice lama (dari dashboard) — payment_info tidak persisten di
+        // order, tapi tersimpan di TopupRequest yang terhubung lewat order_id.
         try {
-          const { data: methods } = await api.get<PaymentMethod[]>("/payment-methods");
-          const pm = methods.find((m) => m.id === pmId);
-          if (pm) setPaymentMethod(pm);
+          const { data: topupRequests } = await api.get<TopupRequest[]>("/topup-request");
+          const linked = topupRequests.find((t) => t.order_id === orderId);
+          if (linked) {
+            data.payment_info = {
+              amount: linked.amount,
+              unique_code: linked.unique_code,
+              total_transfer: linked.total_transfer,
+              payment_method_id: linked.payment_method_id,
+            };
+            if (linked.payment_method) setPaymentMethod(linked.payment_method);
+          }
         } catch {
-          // biarkan tanpa detail metode kalau gagal
+          // biarkan tanpa detail pembayaran kalau gagal
         }
       }
+
+      setOrder(data);
       if (showToast) {
         if (data.status === "active") toast.success("Pembayaran terverifikasi! Pesanan Anda sudah aktif.");
         else toast.info("Status belum berubah. Pembayaran masih menunggu verifikasi admin.");
