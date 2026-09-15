@@ -235,7 +235,6 @@ export function OrderClient() {
       });
   }, []);
   const [selectedDistro, setSelectedDistro]     = useState<Distro>(linuxDistros[0]);
-  const [wantIpStatic, setWantIpStatic]         = useState(false);
   const [domain, setDomain]                     = useState("");
   const [hostname, setHostname]                 = useState("");
   const [customerName, setCustomerName]         = useState("");
@@ -374,7 +373,6 @@ export function OrderClient() {
     const notesLines = [
       `OS: ${selectedDistro.logo} ${selectedDistro.name}`,
       `Hostname: ${hostname}`,
-      wantIpStatic ? "Permintaan IP Public Static (dikonfirmasi & ditagih terpisah oleh admin)" : null,
       note ? `Catatan pelanggan: ${note}` : null,
     ].filter(Boolean);
 
@@ -676,33 +674,6 @@ export function OrderClient() {
                           </div>
                         </div>
 
-                        {/* Add-on: IP Static — VPS only, request saja (ditagih terpisah) */}
-                        <div
-                          onClick={() => setWantIpStatic((v) => !v)}
-                          className={cn(
-                            "flex items-start gap-3 rounded-lg border p-4 cursor-pointer transition-all select-none",
-                            wantIpStatic
-                              ? "border-primary bg-primary/5 ring-1 ring-primary"
-                              : "border-dashed border-border hover:border-primary/50"
-                          )}
-                        >
-                          <div className={cn(
-                            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
-                            wantIpStatic ? "border-primary bg-primary" : "border-muted-foreground/40"
-                          )}>
-                            {wantIpStatic && (
-                              <svg className="h-2.5 w-2.5 text-primary-foreground" viewBox="0 0 12 12" fill="none">
-                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">Minta Add-on: IP Public Static</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Opsional. Biaya tambahan akan dikonfirmasi & ditagih terpisah oleh tim kami setelah order.
-                            </p>
-                          </div>
-                        </div>
                       </>
                     )}
 
@@ -727,12 +698,6 @@ export function OrderClient() {
                         <div className="rounded-lg bg-muted/30 px-4 py-3">
                           <p className="text-xs text-muted-foreground mb-1">Sistem Operasi</p>
                           <p className="font-semibold">{selectedDistro.logo} {selectedDistro.name}</p>
-                        </div>
-                      )}
-                      {!isHosting && wantIpStatic && (
-                        <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 sm:col-span-2">
-                          <p className="text-xs text-muted-foreground mb-1">Add-on</p>
-                          <p className="font-semibold text-primary">IP Public Static diminta (ditagih terpisah)</p>
                         </div>
                       )}
                     </div>
@@ -846,7 +811,6 @@ export function OrderClient() {
                         ["Spesifikasi", selectedPlan?.spec ?? "—"],
                         ...(!isHosting ? [["OS", `${selectedDistro.logo} ${selectedDistro.name}`]] : []),
                         ["Durasi",     selectedDuration.label],
-                        ...(!isHosting && wantIpStatic ? [["IP Static", "Diminta (ditagih terpisah)"]] : []),
                         [isHosting ? "Domain" : "Hostname", isHosting ? (domain || "—") : (hostname || "—")],
                       ].map(([k, v]) => (
                         <div key={k} className="flex justify-between">

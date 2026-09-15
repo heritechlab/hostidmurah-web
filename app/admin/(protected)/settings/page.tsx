@@ -27,6 +27,7 @@ const GENERAL_FIELDS: SettingFieldDef[] = [
   { key: "site_name", label: "Nama Situs", placeholder: "HostIDMurah" },
   { key: "contact_whatsapp", label: "WhatsApp Kontak", placeholder: "6281234567890" },
   { key: "referral_bonus_amount", label: "Bonus Referral (Rp)", type: "number" },
+  { key: "dedicated_ip_addon_price", label: "Harga Add-on IP Dedicated Static (Rp/bulan)", type: "number", placeholder: "100000" },
 ];
 
 const SMTP_FIELDS: SettingFieldDef[] = [

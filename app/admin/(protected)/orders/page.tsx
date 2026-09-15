@@ -50,6 +50,16 @@ interface AdminOrder {
   created_at: string;
   package?: OrderPackage;
   payment_info?: Record<string, unknown>;
+  dedicated_ip_status?: string;
+  dedicated_ip_price?: number;
+}
+
+interface PortRequestLite {
+  id: number;
+  port_number: number;
+  protocol: string;
+  label: string;
+  status: string;
 }
 
 interface TopupRequestLite {
@@ -92,6 +102,12 @@ const statusBadge: Record<string, { label: string; variant: "default" | "seconda
 };
 
 const TABS = [{ label: "Semua", value: null as string | null }, ...STATUS_OPTIONS];
+
+const portStatusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  requested: { label: "Menunggu", variant: "outline" },
+  active: { label: "Aktif", variant: "default" },
+  rejected: { label: "Ditolak", variant: "destructive" },
+};
 
 function formatRupiah(amount: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
@@ -279,6 +295,119 @@ export default function AdminOrdersPage() {
   );
 }
 
+function DedicatedIpAdminSection({ order, onChanged }: { order: AdminOrder; onChanged: () => void }) {
+  const [ipAddress, setIpAddress] = useState(order.ip_address ?? "");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const status = order.dedicated_ip_status ?? "none";
+  if (order.status !== "active" || status === "none") return null;
+
+  const process = async (newStatus: "active" | "rejected") => {
+    setIsProcessing(true);
+    try {
+      await api.put(`/admin/orders/${order.id}/dedicated-ip`, {
+        status: newStatus,
+        ip_address: newStatus === "active" ? (ipAddress || undefined) : undefined,
+      });
+      toast.success(newStatus === "active" ? "Add-on IP Dedicated diaktifkan." : "Permintaan add-on ditolak.");
+      onChanged();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal memproses add-on.";
+      toast.error(msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add-on IP Dedicated Static</p>
+        <Badge variant={status === "requested" ? "outline" : status === "active" ? "default" : "destructive"}>
+          {status === "requested" ? "Menunggu" : status === "active" ? "Aktif" : "Ditolak"}
+        </Badge>
+      </div>
+      {order.dedicated_ip_price !== undefined && order.dedicated_ip_price !== null && (
+        <div className="flex justify-between"><span className="text-muted-foreground">Harga</span><span className="font-medium">{formatRupiah(order.dedicated_ip_price)}</span></div>
+      )}
+      {status === "requested" && (
+        <>
+          <Input placeholder="IP dedicated yang di-assign (opsional)" value={ipAddress} onChange={(e) => setIpAddress(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="gap-1.5" disabled={isProcessing} onClick={() => process("active")}>
+              <Check className="size-3.5" /> Aktifkan
+            </Button>
+            <Button size="sm" variant="destructive" className="gap-1.5" disabled={isProcessing} onClick={() => process("rejected")}>
+              <X className="size-3.5" /> Tolak
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AdminPortsSection({ orderId }: { orderId: number }) {
+  const [ports, setPorts] = useState<PortRequestLite[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+
+  const load = useCallback(() => {
+    setIsLoading(true);
+    api
+      .get<PortRequestLite[]>(`/admin/orders/${orderId}/ports`)
+      .then((res) => setPorts(res.data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [orderId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const process = async (portId: number, status: "active" | "rejected") => {
+    setProcessingId(portId);
+    try {
+      await api.put(`/admin/ports/${portId}`, { status });
+      toast.success(status === "active" ? "Port diaktifkan." : "Port ditolak.");
+      load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal memproses port.";
+      toast.error(msg);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (!isLoading && ports.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Port yang Diminta</p>
+      {isLoading && <p className="text-muted-foreground">Memuat...</p>}
+      {!isLoading && ports.map((p) => (
+        <div key={p.id} className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <span className="font-mono font-medium">{p.port_number}/{p.protocol.toUpperCase()}</span>
+            <span className="text-muted-foreground ml-2">{p.label}</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge variant={portStatusBadge[p.status]?.variant ?? "outline"}>{portStatusBadge[p.status]?.label ?? p.status}</Badge>
+            {p.status === "requested" && (
+              <>
+                <Button size="icon" variant="ghost" className="size-6" disabled={processingId === p.id} onClick={() => process(p.id, "active")}>
+                  <Check className="size-3.5 text-green-600" />
+                </Button>
+                <Button size="icon" variant="ghost" className="size-6" disabled={processingId === p.id} onClick={() => process(p.id, "rejected")}>
+                  <X className="size-3.5 text-red-600" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function OrderDetailDialogBody({
   order,
   onUpdateStatus,
@@ -418,6 +547,9 @@ function OrderDetailDialogBody({
             <p className="whitespace-pre-wrap font-mono text-xs">{order.vps_details}</p>
           </div>
         )}
+
+        <DedicatedIpAdminSection order={order} onChanged={onPaymentProcessed} />
+        {order.dedicated_ip_status === "active" && <AdminPortsSection orderId={order.id} />}
 
         {order.status === "pending_payment" && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">

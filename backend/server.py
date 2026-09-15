@@ -25,9 +25,9 @@ load_dotenv(ROOT_DIR / '.env')
 
 # Import local modules
 from database import (
-    get_db, init_db, User, VPSPackage, VPSOrder, Transaction, 
+    get_db, init_db, User, VPSPackage, VPSOrder, Transaction,
     ReferralLog, NotificationLog, SiteSettings,
-    PaymentMethod, TopupRequest, TopupRequestStatus,
+    PaymentMethod, TopupRequest, TopupRequestStatus, PortRequest,
     SupportTicket, TicketStatus, TicketPriority, TicketReply as TicketReplyModel, TicketReplyRole,
     UserRole, OrderStatus, TransactionType, TransactionStatus, ReferralStatus, NotificationType
 )
@@ -43,6 +43,7 @@ from schemas import (
     PaymentMethodCreate, PaymentMethodUpdate, PaymentMethodResponse,
     TopupRequestCreate, TopupRequestUpdate, TopupRequestResponse,
     TicketCreate, TicketReplyCreate, TicketAdminAction, TicketReplyResponse, TicketResponse,
+    DedicatedIpAdminUpdate, PortRequestCreate, PortRequestUpdate, PortRequestResponse,
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, create_refresh_token,
@@ -143,6 +144,7 @@ async def seed_initial_data():
             ("smtp_from_name", "HostIDMurah"),
             ("smtp_from_email", "noreply@hostidmurah.web.id"),
             ("billing_discounts", '{"1": 0, "3": 5, "6": 10, "12": 15}'),
+            ("dedicated_ip_addon_price", "100000"),
         ]
         
         for key, value in default_settings:
@@ -237,6 +239,21 @@ async def get_billing_discounts(db: AsyncSession) -> dict:
         except (ValueError, TypeError, AttributeError):
             pass
     return BILLING_DISCOUNTS
+
+
+DEDICATED_IP_ADDON_PRICE_DEFAULT = Decimal("100000")
+
+
+async def get_dedicated_ip_price(db: AsyncSession) -> Decimal:
+    """Ambil harga add-on IP Dedicated Static dari SiteSettings, fallback ke default."""
+    result = await db.execute(select(SiteSettings).where(SiteSettings.key == "dedicated_ip_addon_price"))
+    setting = result.scalar_one_or_none()
+    if setting and setting.value:
+        try:
+            return Decimal(setting.value)
+        except (ValueError, TypeError):
+            pass
+    return DEDICATED_IP_ADDON_PRICE_DEFAULT
 
 # ==================== AUTH ROUTES ====================
 
@@ -580,6 +597,13 @@ async def get_billing_discounts_public(db: AsyncSession = Depends(get_db)):
     return {str(k): v for k, v in sorted(discounts.items())}
 
 
+@api_router.get("/dedicated-ip-addon-price")
+async def get_dedicated_ip_addon_price_public(db: AsyncSession = Depends(get_db)):
+    """Harga add-on IP Dedicated Static per bulan (public)"""
+    price = await get_dedicated_ip_price(db)
+    return {"price": float(price)}
+
+
 # ==================== VPS ORDERS ROUTES ====================
 
 #--- NEW Order GANTI DENGAN INI ---
@@ -797,6 +821,147 @@ async def get_order(
     order.package = pkg_result.scalar_one_or_none()
 
     return order
+
+
+async def _get_owned_order(order_id: str, user: User, db: AsyncSession) -> VPSOrder:
+    """Resolve order milik user, terima ID numerik (link lama) atau order_number."""
+    if order_id.isdigit():
+        id_filter = VPSOrder.id == int(order_id)
+    else:
+        id_filter = VPSOrder.order_number == order_id
+
+    result = await db.execute(select(VPSOrder).where(and_(id_filter, VPSOrder.user_id == user.id)))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    return order
+
+
+# ==================== ADD-ON IP DEDICATED STATIC & PORT REQUEST ====================
+
+@api_router.post("/orders/{order_id}/dedicated-ip", response_model=VPSOrderResponse)
+async def request_dedicated_ip(
+    order_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """User request add-on IP Dedicated Static untuk VPS yang sudah aktif.
+    Biaya add-on dikonfirmasi & ditagih terpisah oleh admin (belum ada jalur
+    pembayaran online khusus untuk add-on ini)."""
+    order = await _get_owned_order(order_id, user, db)
+    if order.status != OrderStatus.active:
+        raise HTTPException(status_code=400, detail="Add-on hanya bisa diminta untuk VPS yang sudah aktif")
+    if order.dedicated_ip_status == "active":
+        raise HTTPException(status_code=400, detail="Add-on IP Dedicated Static sudah aktif")
+    if order.dedicated_ip_status == "requested":
+        raise HTTPException(status_code=400, detail="Permintaan add-on sedang diproses admin")
+
+    order.dedicated_ip_status = "requested"
+    order.dedicated_ip_price = await get_dedicated_ip_price(db)
+    await db.commit()
+    await db.refresh(order)
+
+    pkg_result = await db.execute(select(VPSPackage).where(VPSPackage.id == order.package_id))
+    order.package = pkg_result.scalar_one_or_none()
+    return order
+
+
+@api_router.get("/orders/{order_id}/ports", response_model=List[PortRequestResponse])
+async def list_order_ports(
+    order_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    order = await _get_owned_order(order_id, user, db)
+    result = await db.execute(
+        select(PortRequest).where(PortRequest.order_id == order.id).order_by(PortRequest.created_at)
+    )
+    return result.scalars().all()
+
+
+@api_router.post("/orders/{order_id}/ports", response_model=PortRequestResponse)
+async def create_order_port(
+    order_id: str,
+    data: PortRequestCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    order = await _get_owned_order(order_id, user, db)
+    if order.dedicated_ip_status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail="Aktifkan add-on IP Dedicated Static terlebih dahulu sebelum menambah port"
+        )
+    if data.protocol not in ("tcp", "udp"):
+        raise HTTPException(status_code=400, detail="Protokol harus tcp atau udp")
+
+    port = PortRequest(
+        order_id=order.id,
+        port_number=data.port_number,
+        protocol=data.protocol,
+        label=data.label,
+        status="requested",
+    )
+    db.add(port)
+    await db.commit()
+    await db.refresh(port)
+    return port
+
+
+@api_router.put("/orders/{order_id}/ports/{port_id}", response_model=PortRequestResponse)
+async def update_order_port(
+    order_id: str,
+    port_id: int,
+    data: PortRequestUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    order = await _get_owned_order(order_id, user, db)
+    result = await db.execute(
+        select(PortRequest).where(and_(PortRequest.id == port_id, PortRequest.order_id == order.id))
+    )
+    port = result.scalar_one_or_none()
+    if not port:
+        raise HTTPException(status_code=404, detail="Port tidak ditemukan")
+    if port.status != "requested":
+        raise HTTPException(status_code=400, detail="Port yang sudah diproses admin tidak bisa diubah")
+
+    if data.port_number is not None:
+        port.port_number = data.port_number
+    if data.protocol is not None:
+        if data.protocol not in ("tcp", "udp"):
+            raise HTTPException(status_code=400, detail="Protokol harus tcp atau udp")
+        port.protocol = data.protocol
+    if data.label is not None:
+        port.label = data.label
+
+    await db.commit()
+    await db.refresh(port)
+    return port
+
+
+@api_router.delete("/orders/{order_id}/ports/{port_id}")
+async def delete_order_port(
+    order_id: str,
+    port_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    order = await _get_owned_order(order_id, user, db)
+    result = await db.execute(
+        select(PortRequest).where(and_(PortRequest.id == port_id, PortRequest.order_id == order.id))
+    )
+    port = result.scalar_one_or_none()
+    if not port:
+        raise HTTPException(status_code=404, detail="Port tidak ditemukan")
+    if port.status != "requested":
+        raise HTTPException(status_code=400, detail="Port yang sudah diproses admin tidak bisa dihapus")
+
+    await db.delete(port)
+    await db.commit()
+    return {"message": "Port berhasil dihapus"}
+
+# ==================== END ADD-ON IP DEDICATED STATIC & PORT REQUEST ====================
 
 
 # ==================== REFERRAL ROUTES ====================
@@ -1496,6 +1661,73 @@ async def admin_update_order(
     order.package = pkg_result.scalar_one_or_none()
     
     return order
+
+
+@api_router.put("/admin/orders/{order_id}/dedicated-ip", response_model=VPSOrderResponse)
+async def admin_process_dedicated_ip(
+    order_id: int,
+    data: DedicatedIpAdminUpdate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Approve/reject permintaan add-on IP Dedicated Static (admin)"""
+    result = await db.execute(select(VPSOrder).where(VPSOrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order tidak ditemukan")
+    if order.dedicated_ip_status != "requested":
+        raise HTTPException(status_code=400, detail="Tidak ada permintaan add-on yang menunggu diproses")
+    if data.status not in ("active", "rejected"):
+        raise HTTPException(status_code=400, detail="Status harus active atau rejected")
+
+    order.dedicated_ip_status = data.status
+    if data.status == "active" and data.ip_address:
+        order.ip_address = data.ip_address
+
+    await db.commit()
+    await db.refresh(order)
+
+    pkg_result = await db.execute(select(VPSPackage).where(VPSPackage.id == order.package_id))
+    order.package = pkg_result.scalar_one_or_none()
+    return order
+
+
+@api_router.get("/admin/orders/{order_id}/ports", response_model=List[PortRequestResponse])
+async def admin_list_order_ports(
+    order_id: int,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """List semua port request untuk 1 order (admin)"""
+    result = await db.execute(
+        select(PortRequest).where(PortRequest.order_id == order_id).order_by(PortRequest.created_at)
+    )
+    return result.scalars().all()
+
+
+@api_router.put("/admin/ports/{port_id}", response_model=PortRequestResponse)
+async def admin_process_port(
+    port_id: int,
+    data: PortRequestUpdate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Approve/reject permintaan port (admin)"""
+    result = await db.execute(select(PortRequest).where(PortRequest.id == port_id))
+    port = result.scalar_one_or_none()
+    if not port:
+        raise HTTPException(status_code=404, detail="Port tidak ditemukan")
+
+    if data.status:
+        if data.status not in ("active", "rejected"):
+            raise HTTPException(status_code=400, detail="Status harus active atau rejected")
+        port.status = data.status
+    if data.admin_notes is not None:
+        port.admin_notes = data.admin_notes
+
+    await db.commit()
+    await db.refresh(port)
+    return port
 
 
 # Admin Transactions

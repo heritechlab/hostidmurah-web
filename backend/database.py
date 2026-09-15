@@ -124,10 +124,26 @@ class VPSOrder(Base):
     notes = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
     vps_details = Column(Text, nullable=True)  # JSON string: remote access, ports, credentials
+    dedicated_ip_status = Column(String(20), default="none")  # none | requested | active | rejected
+    dedicated_ip_price = Column(Numeric(15, 2), nullable=True)  # snapshot harga add-on saat direquest
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="orders")
     package = relationship("VPSPackage", back_populates="orders")
+
+
+class PortRequest(Base):
+    __tablename__ = "vps_ports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("vps_orders.id"), nullable=False)
+    port_number = Column(Integer, nullable=False)
+    protocol = Column(String(10), default="tcp")  # tcp | udp
+    label = Column(String(255), nullable=False)
+    status = Column(String(20), default="requested")  # requested | active | rejected
+    admin_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Transaction(Base):

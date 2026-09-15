@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Server, Plus, Power, RefreshCw, ExternalLink, Copy, Check, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { Server, Plus, Power, RefreshCw, ExternalLink, Copy, Check, Eye, EyeOff, Loader2, AlertCircle, Globe, Trash2, Pencil, X } from "lucide-react";
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants, Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -29,11 +30,31 @@ interface VPSOrder {
   vps_details?: string;
   notes?: string;
   package?: VPSPackage;
+  dedicated_ip_status?: string;
+  dedicated_ip_price?: number;
+}
+
+interface PortEntry {
+  id: number;
+  port_number: number;
+  protocol: string;
+  label: string;
+  status: string;
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
+
+function formatRupiah(amount: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
+}
+
+const portStatusConfig: Record<string, { label: string; color: string }> = {
+  requested: { label: "Menunggu Admin", color: "text-orange-600 bg-orange-50 dark:bg-orange-950/30" },
+  active: { label: "Aktif", color: "text-green-600 bg-green-50 dark:bg-green-950/30" },
+  rejected: { label: "Ditolak", color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
+};
 
 function parseVpsDetails(raw?: string): Record<string, string> | null {
   if (!raw) return null;
@@ -77,9 +98,242 @@ function CopyableField({ label, value, secret }: { label: string; value: string;
   );
 }
 
-function VpsCard({ order }: { order: VPSOrder }) {
+function DedicatedIpSection({ order, onChanged }: { order: VPSOrder; onChanged: () => void }) {
+  const [price, setPrice] = useState<number | null>(null);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const status = order.dedicated_ip_status ?? "none";
+
+  useEffect(() => {
+    if (status !== "none") return;
+    api
+      .get<{ price: number }>("/dedicated-ip-addon-price")
+      .then((res) => setPrice(res.data.price))
+      .catch(() => {});
+  }, [status]);
+
+  const requestAddon = async () => {
+    const orderRef = order.order_number ?? String(order.id);
+    setIsRequesting(true);
+    try {
+      await api.post(`/orders/${orderRef}/dedicated-ip`);
+      toast.success("Permintaan add-on dikirim, menunggu diaktifkan admin.");
+      onChanged();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal mengirim permintaan add-on.";
+      toast.error(msg);
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  if (status === "active") return null;
+
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Globe className="size-4 text-primary shrink-0" />
+          <div>
+            <p className="text-sm font-medium">Add-on IP Dedicated Static</p>
+            <p className="text-xs text-muted-foreground">
+              Port custom hanya bisa diatur setelah add-on ini aktif.
+              {price !== null && status === "none" && ` Biaya: ${formatRupiah(price)}/bulan.`}
+            </p>
+          </div>
+        </div>
+        {status === "none" && (
+          <Button size="sm" variant="outline" disabled={isRequesting} onClick={requestAddon}>
+            {isRequesting ? "Mengirim..." : "Request Add-on"}
+          </Button>
+        )}
+        {status === "requested" && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-950/30">
+            Menunggu aktivasi admin
+          </span>
+        )}
+        {status === "rejected" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-red-600">Permintaan ditolak</span>
+            <Button size="sm" variant="outline" disabled={isRequesting} onClick={requestAddon}>
+              {isRequesting ? "Mengirim..." : "Request Lagi"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PortsSection({ order }: { order: VPSOrder }) {
+  const orderRef = order.order_number ?? String(order.id);
+  const [ports, setPorts] = useState<PortEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [portNumber, setPortNumber] = useState("");
+  const [protocol, setProtocol] = useState<"tcp" | "udp">("tcp");
+  const [label, setLabel] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const load = () => {
+    setIsLoading(true);
+    api
+      .get<PortEntry[]>(`/orders/${orderRef}/ports`)
+      .then((res) => setPorts(res.data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(load, [orderRef]);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setPortNumber("");
+    setProtocol("tcp");
+    setLabel("");
+  };
+
+  const startEdit = (p: PortEntry) => {
+    setEditingId(p.id);
+    setPortNumber(String(p.port_number));
+    setProtocol(p.protocol as "tcp" | "udp");
+    setLabel(p.label);
+    setShowForm(true);
+  };
+
+  const submit = async () => {
+    const num = Number(portNumber);
+    if (!num || num < 1 || num > 65535) {
+      toast.error("Nomor port harus 1-65535.");
+      return;
+    }
+    if (!label.trim()) {
+      toast.error("Isi label/keterangan port.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      if (editingId) {
+        await api.put(`/orders/${orderRef}/ports/${editingId}`, { port_number: num, protocol, label });
+        toast.success("Port berhasil diperbarui.");
+      } else {
+        await api.post(`/orders/${orderRef}/ports`, { port_number: num, protocol, label });
+        toast.success("Permintaan port dikirim.");
+      }
+      resetForm();
+      load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal menyimpan port.";
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const remove = async (id: number) => {
+    try {
+      await api.delete(`/orders/${orderRef}/ports/${id}`);
+      toast.success("Port berhasil dihapus.");
+      load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal menghapus port.";
+      toast.error(msg);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Port yang Dibuka</p>
+        {!showForm && (
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowForm(true)}>
+            <Plus className="size-3.5" />
+            Tambah Port
+          </Button>
+        )}
+      </div>
+
+      {isLoading && <p className="text-sm text-muted-foreground">Memuat...</p>}
+      {!isLoading && ports.length === 0 && !showForm && (
+        <p className="text-sm text-muted-foreground">Belum ada port yang diminta.</p>
+      )}
+
+      {!isLoading && ports.length > 0 && (
+        <div className="space-y-1.5">
+          {ports.map((p) => {
+            const cfg = portStatusConfig[p.status] ?? portStatusConfig.requested;
+            return (
+              <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono font-medium">{p.port_number}/{p.protocol.toUpperCase()}</span>
+                  <span className="text-muted-foreground truncate">{p.label}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium", cfg.color)}>
+                    {cfg.label}
+                  </span>
+                  {p.status === "requested" && (
+                    <>
+                      <button onClick={() => startEdit(p)} className="text-muted-foreground hover:text-foreground p-1">
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button onClick={() => remove(p.id)} className="text-muted-foreground hover:text-red-600 p-1">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              type="number"
+              placeholder="Nomor port"
+              value={portNumber}
+              onChange={(e) => setPortNumber(e.target.value)}
+              className="col-span-1"
+            />
+            <div className="col-span-2 flex gap-1.5">
+              <Button type="button" size="sm" variant={protocol === "tcp" ? "default" : "outline"} className="flex-1" onClick={() => setProtocol("tcp")}>
+                TCP
+              </Button>
+              <Button type="button" size="sm" variant={protocol === "udp" ? "default" : "outline"} className="flex-1" onClick={() => setProtocol("udp")}>
+                UDP
+              </Button>
+            </div>
+          </div>
+          <Input placeholder="Label, cth. Minecraft Server" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <Button size="sm" disabled={isSubmitting} onClick={submit}>
+              {isSubmitting ? "Menyimpan..." : editingId ? "Simpan" : "Kirim Permintaan"}
+            </Button>
+            <Button size="sm" variant="ghost" className="gap-1" onClick={resetForm}>
+              <X className="size-3.5" />
+              Batal
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VpsCard({ order: initialOrder }: { order: VPSOrder }) {
+  const [order, setOrder] = useState(initialOrder);
   const details = parseVpsDetails(order.vps_details);
   const daysLeft = Math.ceil((new Date(order.expired_at).getTime() - Date.now()) / 86400000);
+
+  const refetch = () => {
+    const orderRef = order.order_number ?? String(order.id);
+    api.get<VPSOrder>(`/orders/${orderRef}`).then((res) => setOrder(res.data)).catch(() => {});
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -121,6 +375,9 @@ function VpsCard({ order }: { order: VPSOrder }) {
           <CopyableField key={k} label={k} value={v} secret={/pass|token|secret|key/i.test(k)} />
         ))}
       </div>
+
+      <DedicatedIpSection order={order} onChanged={refetch} />
+      {order.dedicated_ip_status === "active" && <PortsSection order={order} />}
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <AlertCircle className="size-4 shrink-0" />

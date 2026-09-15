@@ -5,13 +5,12 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DedicatedIpPrice } from "@/components/dedicated-ip-price";
 
 export const metadata: Metadata = {
   title: "Cloud VPS Windows Indonesia — Harga Mulai Rp 149.000",
   description: "VPS Windows Server 2022 dengan RDP access, SSD NVMe, proteksi DDoS, dan administrator akses penuh. Cocok untuk MetaTrader, Remote Desktop, dan bisnis.",
 };
-
-const IP_STATIC_PRICE = "100.000";
 
 const windowsPlans = [
   { id: "vps-w-s",  name: "VPS Windows S",  price: "149.000", cpu: "2 vCPU",  ram: "4 GB",  storage: "80 GB NVMe",  bandwidth: "2 TB" },
@@ -106,7 +105,7 @@ const faqs = [
   },
   {
     q: "Apakah tersedia IP Public Static?",
-    a: `IP Public Static tersedia sebagai add-on seharga Rp ${IP_STATIC_PRICE}/bulan. Pilih opsi ini saat melakukan order.`,
+    a: <>IP Public Static tersedia sebagai add-on seharga Rp <DedicatedIpPrice />/bulan. Request add-on ini dari halaman VPS Saya setelah VPS Anda aktif.</>,
   },
 ];
 
@@ -148,7 +147,7 @@ function PlanCard({ plan }: { plan: typeof windowsPlans[0] & { popular?: boolean
 
         <div className="rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Add-on:</span> IP Public Static
-          <span className="ml-1 text-primary font-medium">+Rp {IP_STATIC_PRICE}/bln</span>
+          <span className="ml-1 text-primary font-medium">+Rp <DedicatedIpPrice />/bln</span>
         </div>
 
         <Link

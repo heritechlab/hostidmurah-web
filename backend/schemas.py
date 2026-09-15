@@ -165,6 +165,8 @@ class VPSOrderResponse(BaseModel):
     package: Optional[VPSPackageResponse] = None
     vps_details: Optional[str] = None  # JSON string
     payment_info: Optional[Dict[str, Any]] = None
+    dedicated_ip_status: Optional[str] = "none"
+    dedicated_ip_price: Optional[Decimal] = None
 
 class VPSOrderRenewRequest(BaseModel):
     payment_mode: Optional[str] = "balance"   # 'balance' | 'transfer'
@@ -177,6 +179,39 @@ class VPSOrderUpdate(BaseModel):
     notes: Optional[str] = None
     ip_address: Optional[str] = None
     vps_details: Optional[str] = None
+
+
+class DedicatedIpAdminUpdate(BaseModel):
+    status: str  # 'active' | 'rejected'
+    ip_address: Optional[str] = None
+
+
+class PortRequestCreate(BaseModel):
+    port_number: int = Field(..., ge=1, le=65535)
+    protocol: str = "tcp"  # tcp | udp
+    label: str
+
+
+class PortRequestUpdate(BaseModel):
+    port_number: Optional[int] = Field(None, ge=1, le=65535)
+    protocol: Optional[str] = None
+    label: Optional[str] = None
+    status: Optional[str] = None  # admin-only: 'active' | 'rejected'
+    admin_notes: Optional[str] = None
+
+
+class PortRequestResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    order_id: int
+    port_number: int
+    protocol: str
+    label: str
+    status: str
+    admin_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
 # Transaction Schemas
 class TopUpCreate(BaseModel):
