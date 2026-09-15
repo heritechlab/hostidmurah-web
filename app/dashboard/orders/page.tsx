@@ -18,6 +18,7 @@ interface VPSPackage {
 
 interface VPSOrder {
   id: number;
+  order_number?: string;
   status: string;
   started_at: string;
   expired_at: string;
@@ -157,12 +158,12 @@ export default function OrdersPage() {
             return (
               <Link
                 key={order.id}
-                href={`/payment?orderId=${order.id}`}
+                href={`/payment?orderId=${order.order_number ?? order.id}`}
                 className="block rounded-xl border border-border bg-card p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:border-primary/50 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm font-mono">#{order.id}</span>
+                    <span className="font-semibold text-sm font-mono">{order.order_number ?? `#${order.id}`}</span>
                     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", cfg.color)}>
                       <Icon className="size-3" />
                       {cfg.label}

@@ -114,6 +114,7 @@ class VPSOrder(Base):
     __tablename__ = "vps_orders"
 
     id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String(30), unique=True, index=True, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     package_id = Column(Integer, ForeignKey("vps_packages.id"), nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.active)

@@ -389,7 +389,7 @@ export function OrderClient() {
         payment_method_id: paymentMode === "transfer" ? selectedMethodId : undefined,
       });
 
-      const paymentParams = new URLSearchParams({ orderId: String(order.id) });
+      const paymentParams = new URLSearchParams({ orderId: order.order_number ?? String(order.id) });
       const pi = order.payment_info as Record<string, number> | undefined;
       if (pi) {
         if (pi.amount !== undefined) paymentParams.set("amount", String(pi.amount));

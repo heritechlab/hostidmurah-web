@@ -215,6 +215,13 @@ async def seed_initial_data():
         
         await db.commit()
 
+def generate_order_number() -> str:
+    """Nomor order unik & tidak mudah ditebak, cth. ORD-20260915-A1B2C3."""
+    import uuid
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return f"ORD-{today}-{uuid.uuid4().hex[:6].upper()}"
+
+
 # Billing cycle discount map (default/fallback jika setting belum di-seed)
 BILLING_DISCOUNTS = {1: 0, 3: 5, 6: 10, 12: 15}
 
@@ -619,6 +626,7 @@ async def create_order(
         user.balance -= total_price
  
         order = VPSOrder(
+            order_number=generate_order_number(),
             user_id=user.id,
             package_id=package.id,
             status=OrderStatus.active,
@@ -672,6 +680,7 @@ async def create_order(
     order_status = OrderStatus.active if remaining_amount <= 0 else OrderStatus.pending_payment
  
     order = VPSOrder(
+        order_number=generate_order_number(),
         user_id=user.id,
         package_id=package.id,
         status=order_status,
@@ -762,14 +771,20 @@ async def list_user_orders(
 
 @api_router.get("/orders/{order_id}", response_model=VPSOrderResponse)
 async def get_order(
-    order_id: int,
+    order_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get order details"""
+    """Get order details. order_id boleh berupa ID numerik (link lama) atau
+    order_number (cth. ORD-20260915-A1B2C3, dipakai untuk link baru)."""
+    if order_id.isdigit():
+        id_filter = VPSOrder.id == int(order_id)
+    else:
+        id_filter = VPSOrder.order_number == order_id
+
     result = await db.execute(
         select(VPSOrder).where(
-            and_(VPSOrder.id == order_id, VPSOrder.user_id == user.id)
+            and_(id_filter, VPSOrder.user_id == user.id)
         )
     )
     order = result.scalar_one_or_none()
@@ -1318,6 +1333,7 @@ async def admin_assign_vps(
     price = Decimal(str(data.get("custom_price", package.price_monthly)))
     
     order = VPSOrder(
+        order_number=generate_order_number(),
         user_id=user.id,
         package_id=package.id,
         status=OrderStatus.active,

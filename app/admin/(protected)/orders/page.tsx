@@ -37,6 +37,7 @@ interface OrderPackage {
 
 interface AdminOrder {
   id: number;
+  order_number?: string;
   user_id: number;
   package_id: number;
   status: string;
@@ -292,7 +293,7 @@ function OrderDetailDialogBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Pesanan #{order.id}</DialogTitle>
+        <DialogTitle>Pesanan #{order.id}{order.order_number ? ` — ${order.order_number}` : ""}</DialogTitle>
       </DialogHeader>
       <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1 text-sm">
         <div className="flex items-center justify-between">

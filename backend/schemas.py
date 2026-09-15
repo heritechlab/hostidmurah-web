@@ -152,6 +152,7 @@ class VPSOrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: int
+    order_number: Optional[str] = None
     user_id: int
     package_id: int
     status: str

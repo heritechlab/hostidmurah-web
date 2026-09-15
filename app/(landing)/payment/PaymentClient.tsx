@@ -28,6 +28,7 @@ const paymentMethods = [
 
 interface RealOrder {
   id: number;
+  order_number?: string;
   status: string;
   price_paid: number;
   expired_at: string;
@@ -50,12 +51,14 @@ interface PaymentMethod {
 }
 
 interface TopupRequest {
+  id: number;
   order_id?: number;
   amount: number;
   unique_code: number;
   total_transfer: number;
   payment_method_id: number;
   payment_method?: PaymentMethod;
+  proof_image?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -103,7 +106,7 @@ export function PaymentClient() {
       total_transfer: searchParams.get("total_transfer") ? Number(searchParams.get("total_transfer")) : undefined,
       payment_method_id: searchParams.get("pmId") ? Number(searchParams.get("pmId")) : undefined,
     };
-    return <RealOrderPayment orderId={Number(orderIdParam)} urlPaymentInfo={urlPaymentInfo} />;
+    return <RealOrderPayment orderId={orderIdParam} urlPaymentInfo={urlPaymentInfo} />;
   }
   return <DemoHostingPayment />;
 }
@@ -114,15 +117,18 @@ function RealOrderPayment({
   orderId,
   urlPaymentInfo,
 }: {
-  orderId: number;
+  orderId: string;
   urlPaymentInfo: { amount?: number; unique_code?: number; total_transfer?: number; payment_method_id?: number };
 }) {
   const router = useRouter();
   const [order, setOrder] = useState<RealOrder | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [topupRequestId, setTopupRequestId] = useState<number | null>(null);
+  const [proofImage, setProofImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
 
   const hasUrlPaymentInfo = urlPaymentInfo.total_transfer !== undefined;
 
@@ -133,21 +139,14 @@ function RealOrderPayment({
       if (hasUrlPaymentInfo) {
         // Baru saja dibuat — payment_info dari URL (respons awal POST /orders)
         data.payment_info = urlPaymentInfo;
-        if (urlPaymentInfo.payment_method_id) {
-          try {
-            const { data: methods } = await api.get<PaymentMethod[]>("/payment-methods");
-            const pm = methods.find((m) => m.id === urlPaymentInfo.payment_method_id);
-            if (pm) setPaymentMethod(pm);
-          } catch {
-            // biarkan tanpa detail metode kalau gagal
-          }
-        }
-      } else if (data.status === "pending_payment") {
-        // Buka ulang invoice lama (dari dashboard) — payment_info tidak persisten di
-        // order, tapi tersimpan di TopupRequest yang terhubung lewat order_id.
+      }
+
+      if (data.status === "pending_payment" && data.payment_info === undefined) {
+        // payment_info tidak persisten di order — cari TopupRequest yang
+        // terhubung lewat order_id (foreign key numerik asli, bukan order_number)
         try {
           const { data: topupRequests } = await api.get<TopupRequest[]>("/topup-request");
-          const linked = topupRequests.find((t) => t.order_id === orderId);
+          const linked = topupRequests.find((t) => t.order_id === data.id);
           if (linked) {
             data.payment_info = {
               amount: linked.amount,
@@ -155,10 +154,27 @@ function RealOrderPayment({
               total_transfer: linked.total_transfer,
               payment_method_id: linked.payment_method_id,
             };
-            if (linked.payment_method) setPaymentMethod(linked.payment_method);
           }
         } catch {
           // biarkan tanpa detail pembayaran kalau gagal
+        }
+      }
+
+      if (data.payment_info?.payment_method_id) {
+        try {
+          const [{ data: methods }, { data: topupRequests }] = await Promise.all([
+            api.get<PaymentMethod[]>("/payment-methods"),
+            api.get<TopupRequest[]>("/topup-request"),
+          ]);
+          const pm = methods.find((m) => m.id === data.payment_info?.payment_method_id);
+          if (pm) setPaymentMethod(pm);
+          const linked = topupRequests.find((t) => t.order_id === data.id);
+          if (linked) {
+            setTopupRequestId(linked.id);
+            setProofImage(linked.proof_image ?? null);
+          }
+        } catch {
+          // biarkan tanpa detail metode/bukti kalau gagal
         }
       }
 
@@ -191,6 +207,30 @@ function RealOrderPayment({
   const handleRefresh = () => {
     setIsRefreshing(true);
     loadOrder(true);
+  };
+
+  const handleUploadProof = async (file: File) => {
+    if (!topupRequestId) {
+      toast.error("Data pembayaran belum siap, coba refresh halaman.");
+      return;
+    }
+    setIsUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      // Jangan set Content-Type manual — biarkan browser isi boundary multipart-nya sendiri
+      const { data: uploaded } = await api.post<{ url: string }>("/upload/proof", formData, {
+        headers: { "Content-Type": undefined },
+      });
+      await api.put(`/topup-request/${topupRequestId}`, { proof_image: uploaded.url });
+      setProofImage(uploaded.url);
+      toast.success("Bukti transfer berhasil diunggah.");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Gagal mengunggah bukti transfer.";
+      toast.error(msg);
+    } finally {
+      setIsUploadingProof(false);
+    }
   };
 
   if (isLoading) {
@@ -236,7 +276,7 @@ function RealOrderPayment({
                 {isActive ? "Pesanan Aktif" : "Selesaikan Pembayaran"}
               </h1>
               <p className="mt-1 text-muted-foreground">
-                Nomor Order: <span className="font-mono font-semibold text-foreground">#{order.id}</span>
+                Nomor Order: <span className="font-mono font-semibold text-foreground">{order.order_number ?? `#${order.id}`}</span>
               </p>
             </div>
             {isActive ? (
@@ -326,6 +366,48 @@ function RealOrderPayment({
                     </div>
                   </div>
 
+                  <div className="rounded-lg bg-muted/40 p-4 space-y-2">
+                    <p className="text-sm font-semibold">Upload Bukti Transfer</p>
+                    {proofImage ? (
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={proofImage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-primary hover:underline"
+                        >
+                          <CheckCircle className="h-4 w-4" /> Lihat bukti yang sudah diunggah
+                        </a>
+                        <label className={cn(buttonVariants({ variant: "outline", size: "sm" }), "cursor-pointer")}>
+                          {isUploadingProof ? "Mengunggah..." : "Ganti File"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={isUploadingProof}
+                            onChange={(e) => e.target.files?.[0] && handleUploadProof(e.target.files[0])}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <label className={cn(buttonVariants({ variant: "outline" }), "w-full cursor-pointer", isUploadingProof && "opacity-50 pointer-events-none")}>
+                          {isUploadingProof ? "Mengunggah..." : "Pilih Gambar Bukti Transfer"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={isUploadingProof}
+                            onChange={(e) => e.target.files?.[0] && handleUploadProof(e.target.files[0])}
+                          />
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Opsional, membantu admin memverifikasi lebih cepat. JPG/PNG/WebP, maks. 5MB.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-800 dark:text-amber-400">
                     <p className="font-semibold mb-1">Penting:</p>
                     <ul className="space-y-1 list-disc list-inside">
@@ -372,7 +454,7 @@ function RealOrderPayment({
               <CardContent className="space-y-3 text-sm">
                 <div className="space-y-2">
                   {[
-                    ["No. Order", `#${order.id}`],
+                    ["No. Order", order.order_number ?? `#${order.id}`],
                     ["Paket", order.package?.name ?? "-"],
                     ["Status", order.status],
                   ].map(([k, v]) => (
@@ -399,7 +481,7 @@ function RealOrderPayment({
                   Tim support siap membantu konfirmasi pembayaran Anda.
                 </p>
                 <a
-                  href={`https://wa.me/6285212348518?text=Halo, saya mau konfirmasi pembayaran order #${order.id}`}
+                  href={`https://wa.me/6285212348518?text=Halo, saya mau konfirmasi pembayaran order ${order.order_number ?? `#${order.id}`}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}
