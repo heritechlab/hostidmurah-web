@@ -32,9 +32,10 @@ const hostingCloudPlans = [
   { id: "hosting-cloud-pro",      name: "Cloud Pro",      basePrice: 179000, spec: "4 vCPU · 4 GB · 80 GB SSD · 8 TB BW" },
 ];
 
-// Diskon durasi — HARUS sama persis dengan BILLING_DISCOUNTS di backend/server.py
-const durations = [
-  { months: 1,  label: "1 Bulan",  discount: 0,  badge: null },
+// Diskon durasi — diambil dari backend (admin bisa atur), ini cuma fallback
+// sebelum data live selesai dimuat.
+const DEFAULT_DURATIONS = [
+  { months: 1,  label: "1 Bulan",  discount: 0,  badge: null as string | null },
   { months: 3,  label: "3 Bulan",  discount: 5,  badge: "Hemat 5%" },
   { months: 6,  label: "6 Bulan",  discount: 10, badge: "Hemat 10%" },
   { months: 12, label: "12 Bulan", discount: 15, badge: "Terbaik 🔥" },
@@ -58,8 +59,23 @@ const windowsDistros = [
 
 type ProductType = "linux" | "windows" | "hosting-shared" | "hosting-wordpress" | "hosting-cloud";
 type Plan = { id: string; name: string; basePrice: number; spec: string; dbId?: number; osOptions?: string };
-type Duration = typeof durations[0];
+type Duration = { months: number; label: string; discount: number; badge: string | null };
 type Distro = typeof linuxDistros[0];
+
+function buildDurations(map: Record<string, number>): Duration[] {
+  const entries = Object.entries(map)
+    .map(([months, discount]) => ({ months: Number(months), discount }))
+    .filter((e) => Number.isFinite(e.months) && e.months > 0)
+    .sort((a, b) => a.months - b.months);
+  if (entries.length === 0) return DEFAULT_DURATIONS;
+  const maxDiscount = Math.max(...entries.map((e) => e.discount));
+  return entries.map((e) => ({
+    months: e.months,
+    label: `${e.months} Bulan`,
+    discount: e.discount,
+    badge: e.discount === 0 ? null : e.discount === maxDiscount ? "Terbaik 🔥" : `Hemat ${e.discount}%`,
+  }));
+}
 
 interface DbPackage {
   id: number;
@@ -202,7 +218,22 @@ export function OrderClient() {
 
   // ─── Form state ────────────────────────────────────────────────────────────
   const [selectedPlan, setSelectedPlan]         = useState<Plan | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<Duration>(durations[0]);
+  const [durations, setDurations]               = useState<Duration[]>(DEFAULT_DURATIONS);
+  const [selectedDuration, setSelectedDuration] = useState<Duration>(DEFAULT_DURATIONS[0]);
+
+  // Diskon durasi — diambil dari backend supaya sinkron dengan yang ditagih
+  useEffect(() => {
+    api
+      .get<Record<string, number>>("/billing-discounts")
+      .then((res) => {
+        const built = buildDurations(res.data);
+        setDurations(built);
+        setSelectedDuration((prev) => built.find((d) => d.months === prev.months) ?? built[0]);
+      })
+      .catch(() => {
+        // biarkan pakai DEFAULT_DURATIONS kalau gagal fetch
+      });
+  }, []);
   const [selectedDistro, setSelectedDistro]     = useState<Distro>(linuxDistros[0]);
   const [wantIpStatic, setWantIpStatic]         = useState(false);
   const [domain, setDomain]                     = useState("");

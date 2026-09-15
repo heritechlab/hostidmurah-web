@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc
 from contextlib import asynccontextmanager
 import os
+import json
 import logging
 import httpx
 from pathlib import Path
@@ -133,6 +134,7 @@ async def seed_initial_data():
             ("contact_whatsapp", "6281234567890"),
             ("smtp_host", "smtp.gmail.com"),
             ("smtp_port", "587"),
+            ("billing_discounts", '{"1": 0, "3": 5, "6": 10, "12": 15}'),
         ]
         
         for key, value in default_settings:
@@ -205,8 +207,21 @@ async def seed_initial_data():
         
         await db.commit()
 
-# Billing cycle discount map
+# Billing cycle discount map (default/fallback jika setting belum di-seed)
 BILLING_DISCOUNTS = {1: 0, 3: 5, 6: 10, 12: 15}
+
+
+async def get_billing_discounts(db: AsyncSession) -> dict:
+    """Ambil diskon durasi dari SiteSettings (bisa diatur admin), fallback ke default."""
+    result = await db.execute(select(SiteSettings).where(SiteSettings.key == "billing_discounts"))
+    setting = result.scalar_one_or_none()
+    if setting and setting.value:
+        try:
+            parsed = json.loads(setting.value)
+            return {int(k): int(v) for k, v in parsed.items()}
+        except (ValueError, TypeError, AttributeError):
+            pass
+    return BILLING_DISCOUNTS
 
 # ==================== AUTH ROUTES ====================
 
@@ -539,8 +554,15 @@ async def get_package(package_id: int, db: AsyncSession = Depends(get_db)):
     
     if not package:
         raise HTTPException(status_code=404, detail="Paket tidak ditemukan")
-    
+
     return package
+
+
+@api_router.get("/billing-discounts")
+async def get_billing_discounts_public(db: AsyncSession = Depends(get_db)):
+    """Diskon durasi langganan per bulan, cth. {"1": 0, "3": 5, "6": 10, "12": 15} (public)"""
+    discounts = await get_billing_discounts(db)
+    return {str(k): v for k, v in sorted(discounts.items())}
 
 
 # ==================== VPS ORDERS ROUTES ====================
@@ -564,11 +586,12 @@ async def create_order(
         raise HTTPException(status_code=404, detail="Paket tidak tersedia")
  
     # Calculate pricing with billing cycle
+    billing_discounts = await get_billing_discounts(db)
     billing_cycle = data.billing_cycle or 1
-    if billing_cycle not in BILLING_DISCOUNTS:
+    if billing_cycle not in billing_discounts:
         billing_cycle = 1
- 
-    discount_pct = BILLING_DISCOUNTS[billing_cycle]
+
+    discount_pct = billing_discounts[billing_cycle]
     monthly_price = package.price_monthly
     discounted_monthly = int(monthly_price * (1 - Decimal(discount_pct) / 100))
     total_price = Decimal(discounted_monthly) * billing_cycle

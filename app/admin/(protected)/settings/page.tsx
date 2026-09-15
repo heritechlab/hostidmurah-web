@@ -34,7 +34,24 @@ const SMTP_FIELDS: SettingFieldDef[] = [
   { key: "smtp_port", label: "SMTP Port", type: "number", placeholder: "587" },
 ];
 
-const KNOWN_KEYS = new Set([...GENERAL_FIELDS, ...SMTP_FIELDS].map((f) => f.key));
+const BILLING_DISCOUNTS_KEY = "billing_discounts";
+const DEFAULT_BILLING_DISCOUNTS: [number, number][] = [[1, 0], [3, 5], [6, 10], [12, 15]];
+
+const KNOWN_KEYS = new Set([...GENERAL_FIELDS, ...SMTP_FIELDS].map((f) => f.key).concat(BILLING_DISCOUNTS_KEY));
+
+function parseBillingDiscounts(raw: string | undefined): [number, number][] {
+  if (!raw) return DEFAULT_BILLING_DISCOUNTS;
+  try {
+    const obj = JSON.parse(raw) as Record<string, number>;
+    const entries = Object.entries(obj)
+      .map(([months, pct]) => [Number(months), Number(pct)] as [number, number])
+      .filter(([months]) => Number.isFinite(months) && months > 0)
+      .sort((a, b) => a[0] - b[0]);
+    return entries.length > 0 ? entries : DEFAULT_BILLING_DISCOUNTS;
+  } catch {
+    return DEFAULT_BILLING_DISCOUNTS;
+  }
+}
 
 function humanizeKey(key: string) {
   return key
@@ -70,6 +87,15 @@ export default function AdminSettingsPage() {
 
   const handleChange = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const billingDiscounts = parseBillingDiscounts(values[BILLING_DISCOUNTS_KEY]);
+
+  const handleBillingDiscountChange = (months: number, pct: number) => {
+    const updated = billingDiscounts.map(([m, p]) => (m === months ? [m, pct] : [m, p]));
+    const obj: Record<string, number> = {};
+    updated.forEach(([m, p]) => { obj[String(m)] = p; });
+    handleChange(BILLING_DISCOUNTS_KEY, JSON.stringify(obj));
   };
 
   const handleSave = async () => {
@@ -137,6 +163,35 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {GENERAL_FIELDS.map(renderField)}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Diskon Durasi Langganan</CardTitle>
+          <CardDescription>
+            Diskon per durasi order VPS (%). Berlaku langsung ke harga yang ditagih ke pelanggan.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {billingDiscounts.map(([months, pct]) => (
+              <div key={months} className="space-y-1.5">
+                <Label>{months} Bulan</Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={pct}
+                    onChange={(e) => handleBillingDiscountChange(months, Number(e.target.value))}
+                    className="pr-7"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
