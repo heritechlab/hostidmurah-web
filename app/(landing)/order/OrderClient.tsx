@@ -101,7 +101,7 @@ interface PaymentMethod {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRupiah(n: number) {
-  return n.toLocaleString("id-ID");
+  return Number(n).toLocaleString("id-ID", { maximumFractionDigits: 0 });
 }
 
 function isVpsType(type: ProductType): type is "linux" | "windows" {
@@ -209,7 +209,7 @@ export function OrderClient() {
       id: String(p.price_monthly),
       dbId: p.id,
       name: p.name,
-      basePrice: p.price_monthly,
+      basePrice: Number(p.price_monthly),
       spec: `${p.cpu} · ${p.ram} · ${p.storage}`,
       osOptions: p.os_options,
     }));

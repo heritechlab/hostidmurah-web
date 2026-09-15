@@ -64,7 +64,7 @@ interface TopupRequest {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatRupiah(n: number) {
-  return n.toLocaleString("id-ID");
+  return Number(n).toLocaleString("id-ID", { maximumFractionDigits: 0 });
 }
 
 function generateOrderId() {
