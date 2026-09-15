@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -47,6 +48,11 @@ interface VPSPackage {
 const SERVER_TYPES = ["vps", "dedicated"];
 const OS_TYPES = ["linux", "windows"];
 const IP_TYPES = ["shared", "static"];
+
+const OS_CHOICES: Record<string, string[]> = {
+  linux: ["Ubuntu 22.04 LTS", "Ubuntu 24.04 LTS", "Debian 12", "AlmaLinux 9", "Rocky Linux 9", "Fedora 40"],
+  windows: ["Windows Server 2019", "Windows Server 2022", "Windows 10 Pro", "Windows 11 Pro"],
+};
 
 function formatRupiah(amount: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
@@ -229,7 +235,9 @@ function PackageFormDialogBody({
   const [serverType, setServerType] = useState(pkg?.server_type ?? "vps");
   const [osType, setOsType] = useState(pkg?.os_type ?? "linux");
   const [ipType, setIpType] = useState(pkg?.ip_type ?? "shared");
-  const [osOptions, setOsOptions] = useState(pkg?.os_options ?? "");
+  const [osOptions, setOsOptions] = useState<string[]>(
+    pkg?.os_options ? pkg.os_options.split(",").map((s) => s.trim()).filter(Boolean) : []
+  );
   const [isActive, setIsActive] = useState(pkg?.is_active ?? true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -244,7 +252,7 @@ function PackageFormDialogBody({
     setServerType(pkg?.server_type ?? "vps");
     setOsType(pkg?.os_type ?? "linux");
     setIpType(pkg?.ip_type ?? "shared");
-    setOsOptions(pkg?.os_options ?? "");
+    setOsOptions(pkg?.os_options ? pkg.os_options.split(",").map((s) => s.trim()).filter(Boolean) : []);
     setIsActive(pkg?.is_active ?? true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg?.id]);
@@ -269,7 +277,7 @@ function PackageFormDialogBody({
         server_type: serverType,
         os_type: osType,
         ip_type: ipType,
-        os_options: osOptions || undefined,
+        os_options: osOptions.length > 0 ? osOptions.join(", ") : null,
       };
       if (mode === "create") {
         await api.post("/admin/packages", payload);
@@ -339,7 +347,13 @@ function PackageFormDialogBody({
           </div>
           <div className="space-y-1.5">
             <Label>Tipe OS</Label>
-            <Select value={osType} onValueChange={(v) => setOsType(v as string)}>
+            <Select
+              value={osType}
+              onValueChange={(v) => {
+                setOsType(v as string);
+                setOsOptions((prev) => prev.filter((o) => OS_CHOICES[v as string]?.includes(o)));
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -366,18 +380,23 @@ function PackageFormDialogBody({
         </div>
         <div className="space-y-1.5">
           <Label>Pilihan Sistem Operasi</Label>
-          <Textarea
-            value={osOptions}
-            onChange={(e) => setOsOptions(e.target.value)}
-            placeholder={
-              osType === "windows"
-                ? "cth. Windows Server 2022, Windows Server 2019, Windows 10 Pro"
-                : "cth. Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Debian 12, AlmaLinux 9"
-            }
-            rows={2}
-          />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-border p-3">
+            {(OS_CHOICES[osType] ?? []).map((os) => (
+              <label key={os} className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={osOptions.includes(os)}
+                  onCheckedChange={(checked) =>
+                    setOsOptions((prev) =>
+                      checked ? [...prev, os] : prev.filter((o) => o !== os)
+                    )
+                  }
+                />
+                {os}
+              </label>
+            ))}
+          </div>
           <p className="text-xs text-muted-foreground">
-            Pisahkan dengan koma. Ini yang akan muncul sebagai pilihan OS saat pelanggan order paket ini. Kosongkan untuk pakai daftar default.
+            Yang dicentang akan muncul sebagai pilihan OS saat pelanggan order paket ini. Kosongkan semua untuk pakai daftar default.
           </p>
         </div>
         {mode === "edit" && (
