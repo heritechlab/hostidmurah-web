@@ -64,12 +64,19 @@ const STATUS_FILTERS = [
   { value: "all", label: "Semua" },
 ] as const;
 
+const OS_TYPE_FILTERS = [
+  { value: "all", label: "Semua OS" },
+  { value: "linux", label: "Linux" },
+  { value: "windows", label: "Windows" },
+] as const;
+
 export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<VPSPackage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selected, setSelected] = useState<VPSPackage | null>(null);
   const [dialogMode, setDialogMode] = useState<"create" | "edit" | "delete" | null>(null);
   const [statusFilter, setStatusFilter] = useState<typeof STATUS_FILTERS[number]["value"]>("active");
+  const [osTypeFilter, setOsTypeFilter] = useState<typeof OS_TYPE_FILTERS[number]["value"]>("all");
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -98,8 +105,9 @@ export default function AdminPackagesPage() {
   };
 
   const filteredPackages = packages.filter((p) => {
-    if (statusFilter === "active") return p.is_active;
-    if (statusFilter === "inactive") return !p.is_active;
+    if (statusFilter === "active" && !p.is_active) return false;
+    if (statusFilter === "inactive" && p.is_active) return false;
+    if (osTypeFilter !== "all" && (p.os_type ?? "linux") !== osTypeFilter) return false;
     return true;
   });
 
@@ -116,20 +124,37 @@ export default function AdminPackagesPage() {
         </Button>
       </div>
 
-      <div className="flex gap-1 border-b border-border pb-1">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setStatusFilter(f.value)}
-            className={
-              statusFilter === f.value
-                ? "px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
-                : "px-3 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
-            }
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 border-b border-border pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={
+                statusFilter === f.value
+                  ? "px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                  : "px-3 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {OS_TYPE_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              onClick={() => setOsTypeFilter(f.value)}
+              className={
+                osTypeFilter === f.value
+                  ? "px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                  : "px-3 py-1.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted border border-border"
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-x-auto">
@@ -163,7 +188,11 @@ export default function AdminPackagesPage() {
               </TableRow>
             )}
             {!isLoading && filteredPackages.map((p) => (
-              <TableRow key={p.id}>
+              <TableRow
+                key={p.id}
+                className="cursor-pointer"
+                onClick={() => openDialog(p, "edit")}
+              >
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-muted-foreground">{p.cpu}</TableCell>
                 <TableCell className="text-muted-foreground">{p.ram}</TableCell>
@@ -178,7 +207,7 @@ export default function AdminPackagesPage() {
                     {p.is_active ? "Aktif" : "Nonaktif"}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
                       <MoreHorizontal className="size-4" />
