@@ -50,8 +50,20 @@ const OS_TYPES = ["linux", "windows"];
 const IP_TYPES = ["shared", "static"];
 
 const OS_CHOICES: Record<string, string[]> = {
-  linux: ["Ubuntu 22.04 LTS", "Ubuntu 24.04 LTS", "Debian 12", "AlmaLinux 9", "Rocky Linux 9", "Fedora 40"],
-  windows: ["Windows Server 2019", "Windows Server 2022", "Windows 10 Pro", "Windows 11 Pro"],
+  linux: [
+    "Ubuntu 20.04 LTS", "Ubuntu 22.04 LTS", "Ubuntu 24.04 LTS",
+    "Debian 11", "Debian 12",
+    "AlmaLinux 8", "AlmaLinux 9",
+    "Rocky Linux 8", "Rocky Linux 9",
+    "CentOS Stream 9",
+    "Fedora 40",
+    "openSUSE Leap 15",
+    "Arch Linux",
+  ],
+  windows: [
+    "Windows Server 2016", "Windows Server 2019", "Windows Server 2022",
+    "Windows 10 Pro", "Windows 11 Pro",
+  ],
 };
 
 function formatRupiah(amount: number) {
@@ -264,6 +276,7 @@ function PackageFormDialogBody({
   const [serverType, setServerType] = useState(pkg?.server_type ?? "vps");
   const [osType, setOsType] = useState(pkg?.os_type ?? "linux");
   const [ipType, setIpType] = useState(pkg?.ip_type ?? "shared");
+  const [customOsInput, setCustomOsInput] = useState("");
   const [osOptions, setOsOptions] = useState<string[]>(
     pkg?.os_options ? pkg.os_options.split(",").map((s) => s.trim()).filter(Boolean) : []
   );
@@ -282,6 +295,7 @@ function PackageFormDialogBody({
     setOsType(pkg?.os_type ?? "linux");
     setIpType(pkg?.ip_type ?? "shared");
     setOsOptions(pkg?.os_options ? pkg.os_options.split(",").map((s) => s.trim()).filter(Boolean) : []);
+    setCustomOsInput("");
     setIsActive(pkg?.is_active ?? true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg?.id]);
@@ -424,8 +438,59 @@ function PackageFormDialogBody({
               </label>
             ))}
           </div>
+
+          {/* OS custom yang ditambahkan admin sendiri (di luar daftar umum) */}
+          {osOptions.filter((o) => !(OS_CHOICES[osType] ?? []).includes(o)).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {osOptions
+                .filter((o) => !(OS_CHOICES[osType] ?? []).includes(o))
+                .map((os) => (
+                  <span
+                    key={os}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary"
+                  >
+                    {os}
+                    <button
+                      type="button"
+                      onClick={() => setOsOptions((prev) => prev.filter((o2) => o2 !== os))}
+                      className="hover:text-destructive"
+                      aria-label={`Hapus ${os}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Input
+              value={customOsInput}
+              onChange={(e) => setCustomOsInput(e.target.value)}
+              placeholder="Tambah OS lain (cth. Ubuntu 18.04 LTS)"
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                const val = customOsInput.trim();
+                if (val && !osOptions.includes(val)) setOsOptions((prev) => [...prev, val]);
+                setCustomOsInput("");
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const val = customOsInput.trim();
+                if (val && !osOptions.includes(val)) setOsOptions((prev) => [...prev, val]);
+                setCustomOsInput("");
+              }}
+            >
+              Tambah
+            </Button>
+          </div>
+
           <p className="text-xs text-muted-foreground">
-            Yang dicentang akan muncul sebagai pilihan OS saat pelanggan order paket ini. Kosongkan semua untuk pakai daftar default.
+            Yang dicentang/ditambahkan akan muncul sebagai pilihan OS saat pelanggan order paket ini. Kosongkan semua untuk pakai daftar default.
           </p>
         </div>
         {mode === "edit" && (
